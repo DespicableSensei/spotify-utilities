@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express')
 var morgan = require('morgan')
 var SpotifyWebApi = require("spotify-web-api-node");
@@ -7,18 +8,16 @@ const app = express()
 app.use(morgan('dev'))
 
 var spotifyApi = new SpotifyWebApi({
-    clientId: "d6aced0ae22a46d9916be0a3e90d1507",
-    clientSecret: "8ea8dec2c61b4c94be3631dde4cca7f0",
-    redirectUri: "http://localhost:5000/gotcode"
+    clientId: process.env.CLIENT_ID,
+    clientSecret: process.env.CLIENT_SECRET,
+    redirectUri: (process.env.HEROKU)?"https://spotifyutils.herokuapp.com/gotcode":"http://localhost:5000/gotcode"
 })
 
 var scopes = ['user-read-private', 'user-read-email', 'user-library-read', 'playlist-modify-private', 'playlist-read-private', 'user-top-read'];
 
 var authorizeURL = spotifyApi.createAuthorizeURL(scopes);
-//console.log(authorizeURL);
 
-//app.set('views', path.join(__dirname, 'views'));
-app.set('view engine', 'jade');
+app.set('view engine', 'pug');
 
 app.get('/', (req, res) => res.send("<a href=" + authorizeURL + ">Login to Spotify</a>"));
 
@@ -82,6 +81,7 @@ app.get("/utilities/topsongs", (req,res) => {
             spotifyApi.addTracksToPlaylist(me,newListId,tt).then(clg => res.send(`<a href="${newListUrl}">${name} on Spotify</a>`),err => console.log("82!",err));
         }, (err) => {
             console.log('84!', err);
+            res.send(err)
         });
     }, err => console.log("86!", err))
 });
