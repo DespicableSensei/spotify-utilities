@@ -1,4 +1,4 @@
-require('dotenv').config();
+if(!process.env.HEROKU){require('dotenv').config()}
 const express = require('express')
 var morgan = require('morgan')
 var SpotifyWebApi = require("spotify-web-api-node");
