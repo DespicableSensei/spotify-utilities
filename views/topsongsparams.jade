@@ -1,0 +1,12 @@
+doctype html
+div
+    form(action='/utilities/topsongs' method="get") 
+        select(name='time_range', id='')
+            option(value="long_term", label="Several Years")
+            option(value="medium_term", label="6 Months")
+            option(value="short_term", label="4 Weeks")
+        label(for="limit") Limit:
+        input(type='number', name="limit", id='limitNum', value="50", max="50", min="1")
+        label(for="offset") Offset:
+        input(type='number', name="offset", id='offsetNum', value="0", min="0") 
+        input(type='submit', value='Submit')
