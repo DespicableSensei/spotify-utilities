@@ -1,11 +1,14 @@
 if(!process.env.HEROKU){require('dotenv').config()}
 const express = require('express')
+const fileUpload = require('express-fileupload')
+const sharp = require("sharp")
 var morgan = require('morgan')
-var SpotifyWebApi = require("spotify-web-api-node");
+var SpotifyWebApi = require("spotify-web-api-node")
 
-const app = express()
+const app = express();
 
-app.use(morgan('dev'))
+app.use(morgan('dev'));
+app.use(fileUpload());
 
 var spotifyApi = new SpotifyWebApi({
     clientId: process.env.CLIENT_ID,
@@ -129,6 +132,17 @@ app.get("/utilities/allplaylistsongs", (req,res) => {
             res.send(allItems.map(i => i.track.name));
         }, err => console.log(err));
     }, err => console.log(err))
+});
+
+app.get("/utilities/uploadcover", (req,res) => {
+    res.render("upload");
+});
+
+app.post('/utilities/uploader', function(req, res) {
+    if (!req.files) return res.status(400).send('No files were uploaded.');
+    let sampleFile = req.files.bruh;
+    var cover = sharp(sampleFile.data).resize(512,512).jpeg({quality: 90}).toFile("cover.jpeg").then(x => console.log(x))
+    res.send(`<img src="${__dirname}/cover.jpeg">`)
 });
 
 app.listen((process.env.PORT || 5000), () => console.log('Example app listening on port ' + (process.env.PORT || 5000)));
