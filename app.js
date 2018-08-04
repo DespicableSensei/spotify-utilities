@@ -2,6 +2,8 @@ if(!process.env.HEROKU){require('dotenv').config()}
 const express = require('express')
 const fileUpload = require('express-fileupload')
 const sharp = require("sharp")
+const fs = require("fs")
+const path = require("path")
 var morgan = require('morgan')
 var SpotifyWebApi = require("spotify-web-api-node")
 
@@ -9,6 +11,7 @@ const app = express();
 
 app.use(morgan('dev'));
 app.use(fileUpload());
+app.use('/static', express.static(path.join(__dirname, 'public')))
 
 var spotifyApi = new SpotifyWebApi({
     clientId: process.env.CLIENT_ID,
@@ -110,7 +113,7 @@ app.get("/utilities/pickplaylist", (req,res) => {
     var me;
     spotifyApi.getMe().then(x => me = x.body.id,err => res.send(err));
     spotifyApi.getUserPlaylists(me,{limit:50}).then((data) => {
-        res.render("playlistslist", {playlists: data.body.items.map(y => {return {name: y.name, id: y.id, length: y.tracks.total}}), target: target});
+        res.render("playlistslist", {playlists: data.body.items.map(y => {return {name: y.name, id: y.id, user: me, length: y.tracks.total}}), target: target});
     }, err => {
         console.log('121!', err);
     });
@@ -141,8 +144,15 @@ app.get("/utilities/uploadcover", (req,res) => {
 app.post('/utilities/uploader', function(req, res) {
     if (!req.files) return res.status(400).send('No files were uploaded.');
     let sampleFile = req.files.bruh;
-    var cover = sharp(sampleFile.data).resize(512,512).jpeg({quality: 90}).toFile("cover.jpeg").then(x => console.log(x))
-    res.send(`<img src="${__dirname}/cover.jpeg">`)
+    var cover = sharp(sampleFile.data).resize(512,512).jpeg({quality: 90}).toFile(__dirname + "/public/image/cover.jpeg").then(x => {
+        fs.readdir("./public/image/", (err,files) => {
+            if(err) console.error(err)
+            if(files.find(z => z === "cover.jpeg")) {
+                console.log(files);
+                res.redirect("/static/image/cover.jpeg")
+            }
+        })
+    })
 });
 
 app.listen((process.env.PORT || 5000), () => console.log('Example app listening on port ' + (process.env.PORT || 5000)));
