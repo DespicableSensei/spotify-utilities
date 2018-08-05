@@ -1,4 +1,6 @@
+-var url = '/utilities/uploader?id=' + id
+
 body
-    form(action="/utilities/uploader", method="post", id="uploadForm", ref="uploadForm", encType="multipart/form-data")
+    form(action=url method="post", id="uploadForm", ref="uploadForm", encType="multipart/form-data", )
         input(type="file", name="bruh", accept="image/*")
         input(type="submit", value="upload")

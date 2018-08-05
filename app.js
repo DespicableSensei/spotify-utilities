@@ -1,9 +1,10 @@
 if(!process.env.HEROKU){require('dotenv').config()}
 const express = require('express')
 const fileUpload = require('express-fileupload')
-const sharp = require("sharp")
 const fs = require("fs")
 const path = require("path")
+const request = require("request")
+const sharp = require("sharp")
 var morgan = require('morgan')
 var SpotifyWebApi = require("spotify-web-api-node")
 
@@ -19,9 +20,11 @@ var spotifyApi = new SpotifyWebApi({
     redirectUri: (process.env.HEROKU)?"https://spotifyutils.herokuapp.com/gotcode":"http://localhost:5000/gotcode"
 })
 
-var scopes = ['user-read-private', 'user-read-email', 'user-library-read', 'playlist-modify-private', 'playlist-read-private', 'user-top-read'];
+var scopes = ['user-read-private', 'user-read-email', 'user-library-read', 'playlist-modify-public', 'playlist-modify-private', 'ugc-image-upload', 'playlist-read-private', 'user-top-read'];
 
 var authorizeURL = spotifyApi.createAuthorizeURL(scopes);
+
+let me,token;
 
 app.set('view engine', 'pug');
 
@@ -29,13 +32,17 @@ app.get('/', (req, res) => res.send("<a href=" + authorizeURL + ">Login to Spoti
 
 app.get("/gotcode", (req, res) => {
     spotifyApi.authorizationCodeGrant(req.query.code).then(d => {
+        token = d.body['access_token'];
         spotifyApi.setAccessToken(d.body['access_token']);
         spotifyApi.setRefreshToken(d.body['refresh_token'])
     }, err => console.log(err));
     res.send(`<p>You have logged in with: ${req.query.code}</p><a href="/utilities">Utilities</a>`);
 });
 
-app.get("/utilities", (req,res) => res.render("utilities"))
+app.get("/utilities", (req,res) => {
+    spotifyApi.getMe().then(x => me = x.body.id,err => res.send(err));
+    res.render("utilities");
+})
 
 app.get("/utilities/me", (req,res) => {
     spotifyApi.getMe()
@@ -110,8 +117,6 @@ app.get("/utilities/allsongs", (req,res) => {
 
 app.get("/utilities/pickplaylist", (req,res) => {
     var target = req.query.target;
-    var me;
-    spotifyApi.getMe().then(x => me = x.body.id,err => res.send(err));
     spotifyApi.getUserPlaylists(me,{limit:50}).then((data) => {
         res.render("playlistslist", {playlists: data.body.items.map(y => {return {name: y.name, id: y.id, user: me, length: y.tracks.total}}), target: target});
     }, err => {
@@ -121,8 +126,6 @@ app.get("/utilities/pickplaylist", (req,res) => {
 
 app.get("/utilities/allplaylistsongs", (req,res) => {
     let requestedId = req.query.id;
-    var me;
-    spotifyApi.getMe().then(x => me = x.body.id,err => res.send(err));
     spotifyApi.getPlaylistTracks(me,requestedId).then(alltracks => {
         let count = alltracks.body.total;
         let myLibrary = [];
@@ -138,21 +141,34 @@ app.get("/utilities/allplaylistsongs", (req,res) => {
 });
 
 app.get("/utilities/uploadcover", (req,res) => {
-    res.render("upload");
+    res.render("upload",{id: req.query.id});
 });
 
 app.post('/utilities/uploader', function(req, res) {
+    let pid = req.query.id;
+    let pif;
+    spotifyApi.getPlaylist(me,pid).then(data => {pif = {name: data.body.name, url: data.body["external_urls"]["spotify"]}})
     if (!req.files) return res.status(400).send('No files were uploaded.');
     let sampleFile = req.files.bruh;
-    var cover = sharp(sampleFile.data).resize(512,512).jpeg({quality: 90}).toFile(__dirname + "/public/image/cover.jpeg").then(x => {
+    var cover = sharp(sampleFile.data).resize(512,512).jpeg({quality: 90});
+    var buffet = cover.toFile(__dirname + "/public/image/cover.jpeg").then(buff => {
+        var cl = fs.createReadStream(__dirname + "/public/image/cover.jpeg", {encoding: "base64"}).pipe(
+            request.put(`https://api.spotify.com/v1/users/${me}/playlists/${pid}/images`,{headers: {"Authorization": "Bearer " + token, "Content-Type": "image/jpeg"}}, (s,v) => {
+                res.render("coverpage", {name:pif.name,url:pif.url,id:pid})
+            })
+        );
+    })
+    /* cover.toFile(__dirname + "/public/image/cover.jpeg").then(x => {
         fs.readdir("./public/image/", (err,files) => {
             if(err) console.error(err)
             if(files.find(z => z === "cover.jpeg")) {
                 console.log(files);
-                res.redirect("/static/image/cover.jpeg")
+                console.log();
+                request("/static/image/cover.jpeg").pipe(request.put(`https://api.spotify.com/v1/users/${me}/playlists/${pid}/images`),{"Authorization": token, "Content-Type": "image/jpeg"}, (requested,response,error) => {console.log(requested,response,error);})
             }
+                request.put(`https://api.spotify.com/v1/users/${me}/playlists/${pid}/images`),{"Authorization": "Basic " + token, "Content-Type": "image/jpeg"})
         })
-    })
+    }).catch(err => console.error) */
 });
 
 app.listen((process.env.PORT || 5000), () => console.log('Example app listening on port ' + (process.env.PORT || 5000)));
