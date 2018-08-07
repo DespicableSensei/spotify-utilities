@@ -151,8 +151,8 @@ app.post('/utilities/uploader', function(req, res) {
     if (!req.files) return res.status(400).send('No files were uploaded.');
     let sampleFile = req.files.bruh;
     var cover = sharp(sampleFile.data).resize(512,512).jpeg({quality: 90});
-    var buffet = cover.toFile(__dirname + "/public/image/cover.jpeg").then(buff => {
-        var cl = fs.createReadStream(__dirname + "/public/image/cover.jpeg", {encoding: "base64"}).pipe(
+    var buffet = cover.toFile(path.join(__dirname + "/public/image/cover.jpeg")).then(buff => {
+        var cl = fs.createReadStream(path.join(__dirname + "/public/image/cover.jpeg"), {encoding: "base64"}).pipe(
             request.put(`https://api.spotify.com/v1/users/${me}/playlists/${pid}/images`,{headers: {"Authorization": "Bearer " + token, "Content-Type": "image/jpeg"}}, (s,v) => {
                 res.render("coverpage", {name:pif.name,url:pif.url,id:pid})
             })
