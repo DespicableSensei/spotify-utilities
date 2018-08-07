@@ -158,17 +158,6 @@ app.post('/utilities/uploader', function(req, res) {
             })
         );
     })
-    /* cover.toFile(__dirname + "/public/image/cover.jpeg").then(x => {
-        fs.readdir("./public/image/", (err,files) => {
-            if(err) console.error(err)
-            if(files.find(z => z === "cover.jpeg")) {
-                console.log(files);
-                console.log();
-                request("/static/image/cover.jpeg").pipe(request.put(`https://api.spotify.com/v1/users/${me}/playlists/${pid}/images`),{"Authorization": token, "Content-Type": "image/jpeg"}, (requested,response,error) => {console.log(requested,response,error);})
-            }
-                request.put(`https://api.spotify.com/v1/users/${me}/playlists/${pid}/images`),{"Authorization": "Basic " + token, "Content-Type": "image/jpeg"})
-        })
-    }).catch(err => console.error) */
 });
 
 app.listen((process.env.PORT || 5000), () => console.log('Example app listening on port ' + (process.env.PORT || 5000)));
