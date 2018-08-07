@@ -10,5 +10,5 @@ body
             select(name='id', id='slct')
                 option(value="null", label="Pick a Playlist", selected="selected", hidden)
                 each playlist in playlists
-                    option(value=playlist.id, label=playlist.name)
+                    option(value=playlist.id, label=playlist.name) #{playlist.name}
                 input(type='submit', value='Submit')
