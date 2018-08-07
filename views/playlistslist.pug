@@ -3,7 +3,7 @@ h3 Choose Your Playlist
 -var url = '/utilities/' + target
 div
     form(action=url method="get") 
-        select(name='id', id='')
+        select(name='id', id='', multiple='multiple', size='12')
             each playlist in playlists
                 option(value=playlist.id, label=playlist.name)
             input(type='submit', value='Submit')
