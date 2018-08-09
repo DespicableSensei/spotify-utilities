@@ -1,9 +1,13 @@
 doctype html
-h3 Choose Your Playlist
 -var url = '/utilities/' + target
-div
-    form(action=url method="get") 
-        select(name='id', id='')
-            each playlist in playlists
-                option(value=playlist.id, label=playlist.name)
-            input(type='submit', value='Submit')
+head
+    script
+        include ../safariDropdown.js
+body
+    h3 Choose Your Playlist
+    div
+        form(action=url method="get") 
+            select(name='id', id='slct')
+                each playlist in playlists
+                    option(value=playlist.id, label=playlist.name) #{playlist.name}
+                input(type='submit', value='Submit')

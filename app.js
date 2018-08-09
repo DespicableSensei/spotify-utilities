@@ -138,8 +138,6 @@ app.get("/utilities/topsongscombined", (req,res) => {
             console.log('132!', err);
             res.send(err)
         });
-        //combinedListWithScores.sort((a,b) => a.score-b.score);
-        console.log(sortedArray);
     }).catch(err => {
         console.log(err);
     })
@@ -197,24 +195,13 @@ app.post('/utilities/uploader', function(req, res) {
     if (!req.files) return res.status(400).send('No files were uploaded.');
     let sampleFile = req.files.bruh;
     var cover = sharp(sampleFile.data).resize(512,512).jpeg({quality: 90});
-    var buffet = cover.toFile(__dirname + "/public/image/cover.jpeg").then(buff => {
-        var cl = fs.createReadStream(__dirname + "/public/image/cover.jpeg", {encoding: "base64"}).pipe(
+    var buffet = cover.toFile(path.join(__dirname + "/public/image/cover.jpeg")).then(buff => {
+        var cl = fs.createReadStream(path.join(__dirname + "/public/image/cover.jpeg"), {encoding: "base64"}).pipe(
             request.put(`https://api.spotify.com/v1/users/${me}/playlists/${pid}/images`,{headers: {"Authorization": "Bearer " + token, "Content-Type": "image/jpeg"}}, (s,v) => {
                 res.render("coverpage", {name:pif.name,url:pif.url,id:pid,img:"cover"})
             })
         );
     }).catch(err => console.error(err))
-    /* cover.toFile(__dirname + "/public/image/cover.jpeg").then(x => {
-        fs.readdir("./public/image/", (err,files) => {
-            if(err) console.error(err)
-            if(files.find(z => z === "cover.jpeg")) {
-                console.log(files);
-                console.log();
-                request("/static/image/cover.jpeg").pipe(request.put(`https://api.spotify.com/v1/users/${me}/playlists/${pid}/images`),{"Authorization": token, "Content-Type": "image/jpeg"}, (requested,response,error) => {console.log(requested,response,error);})
-            }
-                request.put(`https://api.spotify.com/v1/users/${me}/playlists/${pid}/images`),{"Authorization": "Basic " + token, "Content-Type": "image/jpeg"})
-        })
-    }).catch(err => console.error) */
 });
 
 app.listen((process.env.PORT || 5000), () => console.log('Example app listening on port ' + (process.env.PORT || 5000)));

@@ -1,5 +1,5 @@
-
-    list-styletype: none;
+ul {
+    list-style-type: none;
 }
 body
 {
@@ -47,4 +47,3 @@ h3 {
     margin: 5px;
     padding: 2px;
 }
-
