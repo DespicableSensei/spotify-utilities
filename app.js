@@ -99,6 +99,52 @@ app.get("/utilities/topsongs", (req,res) => {
     }, err => console.log("86!", err))
 });
 
+app.get("/utilities/topsongscombined", (req,res) => {
+    let timeFrames = ["long_term", "medium_term", "short_term"];
+    let optionsArray = timeFrames.map(time => {return {"limit": 50, "offset": 0, "time_range": time}});
+    let name = "Kümülatif 50";
+    var me;
+    spotifyApi.getMe().then(x => me = x.body.id, err => res.send(err));
+    let promiseArray = [];
+    optionsArray.forEach(opt => {
+        var apiReq = spotifyApi.getMyTopTracks(opt);
+        promiseArray.push(apiReq);
+    });
+    Promise.all(promiseArray).then(data => {
+        let itemsByLists = data.map(d => d.body.items.map((i,index) => {return {id: i.id, index: index}}));
+        let combinedListWithScores = {};
+        itemsByLists.forEach((list,listIndex) => list.forEach(item => {
+            if(combinedListWithScores[item.id]) {
+                combinedListWithScores[item.id].score += (50 - item.index) * (listIndex + 1)
+                combinedListWithScores[item.id].existsIn.push(listIndex + 1);
+            }
+            else {
+                combinedListWithScores[item.id] = {score: (50 - item.index) * (listIndex + 1), existsIn: [listIndex + 1], id: item.id};
+            }
+        }))
+        let sortedArray = Object.keys(combinedListWithScores).map(idobj => combinedListWithScores[idobj]).sort((a,b) => b.score - a.score).slice(0,50);
+        let sortedUris = sortedArray.map(i => "spotify:track:" + i.id);
+        spotifyApi.createPlaylist(me, name, { 'public' : false , 'description' : 'ağırlıklı ortalama gibi düşünebilirsin bu listeyi'}).then((dataa) => {
+            const newListId = dataa.body.id;
+            const newListUrl = dataa.body["external_urls"]["spotify"];
+            spotifyApi.addTracksToPlaylist(me,newListId,sortedUris).then(clg => {
+                var cl = fs.createReadStream(__dirname + "/public/image/top.jpeg", {encoding: "base64"}).pipe(
+                    request.put(`https://api.spotify.com/v1/users/${me}/playlists/${newListId}/images`,{headers: {"Authorization": "Bearer " + token, "Content-Type": "image/jpeg"}}, (s,v) => {
+                        res.render("coverpage", {name:name,url:newListUrl,img:"top"})
+                    })
+                );
+            },err => console.log("130!",err));
+        }, (err) => {
+            console.log('132!', err);
+            res.send(err)
+        });
+        //combinedListWithScores.sort((a,b) => a.score-b.score);
+        console.log(sortedArray);
+    }).catch(err => {
+        console.log(err);
+    })
+});
+
 app.get("/utilities/allsongs", (req,res) => {
     spotifyApi.getMySavedTracks().then(saved => {
         let count = saved.body.total;
@@ -154,10 +200,10 @@ app.post('/utilities/uploader', function(req, res) {
     var buffet = cover.toFile(__dirname + "/public/image/cover.jpeg").then(buff => {
         var cl = fs.createReadStream(__dirname + "/public/image/cover.jpeg", {encoding: "base64"}).pipe(
             request.put(`https://api.spotify.com/v1/users/${me}/playlists/${pid}/images`,{headers: {"Authorization": "Bearer " + token, "Content-Type": "image/jpeg"}}, (s,v) => {
-                res.render("coverpage", {name:pif.name,url:pif.url,id:pid})
+                res.render("coverpage", {name:pif.name,url:pif.url,id:pid,img:"cover"})
             })
         );
-    })
+    }).catch(err => console.error(err))
     /* cover.toFile(__dirname + "/public/image/cover.jpeg").then(x => {
         fs.readdir("./public/image/", (err,files) => {
             if(err) console.error(err)

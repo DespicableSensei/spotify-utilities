@@ -1,8 +1,9 @@
 head
     style
         include style.css
+-var imgurl = "url(/static/image/" + img + ".jpeg)";
 body
-    div.center-div
+    div.center-div(style={"background-image": imgurl})
         div.inner-text
             h2 #{name}
             a(href=url)
