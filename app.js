@@ -30,52 +30,45 @@ app.set('view engine', 'pug');
 
 app.get('/', (req, res) => res.send("<a href=" + authorizeURL + ">Login to Spotify</a>"));
 
-app.get("/gotcode", (req, res) => {
-    spotifyApi.authorizationCodeGrant(req.query.code).then(d => {
+app.get("/gotcode", async (req, res) => {
+    await spotifyApi.authorizationCodeGrant(req.query.code).then(d => {
         token = d.body['access_token'];
         spotifyApi.setAccessToken(d.body['access_token']);
-        spotifyApi.setRefreshToken(d.body['refresh_token'])
+        spotifyApi.setRefreshToken(d.body['refresh_token']);
     }, err => console.log(err));
-    res.send(`<p>You have logged in with: ${req.query.code}</p><a href="/utilities">Utilities</a>`);
+    spotifyApi.getMe().then(x => me = x.body.id,err => res.send(Object.assign(err,{source:"/gotcode getMe"})));
+    if(req.query.state === "c50") {
+        res.redirect("/your_playlist_will_be_ready_very_soon")
+    }
+    else {
+        res.send(`<p>You have logged in with: ${req.query.code}</p><a href="/utilities">Utilities</a>`);
+    }
 });
 
 app.get("/utilities", (req,res) => {
-    spotifyApi.getMe().then(x => me = x.body.id,err => res.send(err));
     res.render("utilities");
 })
 
 app.get("/utilities/me", (req,res) => {
-    spotifyApi.getMe()
-  .then(function(data) {
-    console.log('Some information about the authenticated user', data.body);
-    res.send(data.body)
-  }, function(err) {
-    console.log('34!', err);
-    res.send(err)
-  });
+    spotifyApi.getMe().then(data => res.send(data.body), err => res.send(err));
 });
 
 app.get("/utilities/playlistchosen", (req,res) => {
     let playlistId = req.query.id;
-    let playlistName;
-    var me;
-    spotifyApi.getMe().then(x => me = x.body.id,err => res.send(err));
     spotifyApi.getPlaylist(me,playlistId).then((data) => {
-        playlistName = data.body.name;
+        let playlistName = data.body.name;
         const orderedArray = data.body.tracks.items.map(x => x.track.id);
         var shuffledArray = orderedArray.shuffle();
-        spotifyApi.createPlaylist(me, playlistName + " [SHUFFLED]", { 'public' : false }).then((dataa) => {
-            const newListId = dataa.body.id;
-            const newListUrl = dataa.body["external_urls"]["spotify"];
+        spotifyApi.createPlaylist(me, playlistName + " [SHUFFLED]", { 'public' : false }).then(newPlaylist => {
+            const newListId = newPlaylist.body.id;
+            const newListUrl = newPlaylist.body.external_urls.spotify;
             const tracksString = shuffledArray.map(x => "spotify:track:" + x);
-            spotifyApi.addTracksToPlaylist(me,newListId,tracksString).then(clg => res.send(`<a href="${newListUrl}">${playlistName} [SHUFFLED] on Spotify</a>`),err => console.log("70!",err));
-        }, (err) => {
-            console.log('72!', err);
-        });
-  }, function(err) {
-    console.log('75!', err);
-  });
-})
+            spotifyApi.addTracksToPlaylist(me,newListId,tracksString).then(tracksAdded => {
+                res.send(`<a href="${newListUrl}">${playlistName} [SHUFFLED] on Spotify</a>`);
+            }, onReject => console.log(onReject));
+        }, onReject => console.log(onReject));
+    }, onReject => console.log(onReject));
+});
 
 app.get("/utilities/topsongsparams", (req,res) => {
     res.render("topsongsparams");
@@ -103,8 +96,6 @@ app.get("/utilities/topsongscombined", (req,res) => {
     let timeFrames = ["long_term", "medium_term", "short_term"];
     let optionsArray = timeFrames.map(time => {return {"limit": 50, "offset": 0, "time_range": time}});
     let name = "Kümülatif 50";
-    var me;
-    spotifyApi.getMe().then(x => me = x.body.id, err => res.send(err));
     let promiseArray = [];
     optionsArray.forEach(opt => {
         var apiReq = spotifyApi.getMyTopTracks(opt);
@@ -128,7 +119,7 @@ app.get("/utilities/topsongscombined", (req,res) => {
             const newListId = dataa.body.id;
             const newListUrl = dataa.body["external_urls"]["spotify"];
             spotifyApi.addTracksToPlaylist(me,newListId,sortedUris).then(clg => {
-                var cl = fs.createReadStream(__dirname + "/public/image/top.jpeg", {encoding: "base64"}).pipe(
+                var cl = fs.createReadStream(path.join(__dirname + "/public/image/top.jpeg"), {encoding: "base64"}).pipe(
                     request.put(`https://api.spotify.com/v1/users/${me}/playlists/${newListId}/images`,{headers: {"Authorization": "Bearer " + token, "Content-Type": "image/jpeg"}}, (s,v) => {
                         res.render("coverpage", {name:name,url:newListUrl,img:"top"})
                     })
@@ -203,6 +194,48 @@ app.post('/utilities/uploader', function(req, res) {
         );
     }).catch(err => console.error(err))
 });
+
+app.get("/c50", (req,res) => {
+    var aURL = spotifyApi.createAuthorizeURL(scopes,"c50");
+    res.redirect(aURL);
+});
+
+app.get("/your_playlist_will_be_ready_very_soon", (req,res) => {
+    let name = "Kümülatif 50";
+    let timeFrames = ["long_term", "medium_term", "short_term"];
+    let optionsArray = timeFrames.map(time => {return {"limit": 50, "offset": 0, "time_range": time}});
+    let promiseArray = optionsArray.map(opt => spotifyApi.getMyTopTracks(opt));
+    Promise.all(promiseArray).then(onFullfill => {
+        let itemsByLists = onFullfill.map(d => d.body.items.map((i,index) => {return {id: i.id, index: index}}));
+        let evaluatedTracks = [];
+
+        itemsByLists.forEach((list,listIndex) => list.forEach(item => {
+            var trackInPlaylist = evaluatedTracks.find(x => x.id === item.id);
+            if(trackInPlaylist) {
+                trackInPlaylist.score += (50 - item.index) * (listIndex + 1);
+                trackInPlaylist.existsIn.push(listIndex + 1);
+            }
+            else {
+                var evaluatedTrack = Object.assign(item,{score: (50 - item.index) * (listIndex + 1), existsIn: [listIndex + 1]})
+                evaluatedTracks.push(evaluatedTrack);
+            }
+        }));
+
+        let playlistTracks = evaluatedTracks.sort((a,b) => b.score - a.score).slice(0,50).map(track => "spotify:track:" + track.id);
+        let description = "zaman ağırlıklı ortalama gibi düşünebilirsin bu listeyi. matematiksel olarak en çok açmak isteyebileceğin sıradalar.";
+        spotifyApi.createPlaylist(me,name,{public: true, description: description}).then(newPlaylist => {
+            spotifyApi.addTracksToPlaylist(me,newPlaylist.body.id,playlistTracks).then(tracksAdded => {
+                //Adding a cover image.
+                fs.createReadStream(path.join(__dirname + "/public/image/top.jpeg"), {encoding: "base64"}).pipe(
+                    request.put(`https://api.spotify.com/v1/users/${me}/playlists/${newPlaylist.body.id}/images`,{headers: {"Authorization": "Bearer " + token, "Content-Type": "image/jpeg"}}, () => {
+                        res.render("coverpage", {name:name,url:newPlaylist.body.external_urls.spotify,img:"top"});
+                    })
+                );
+            }, onReject => {console.error(onReject)});
+        }, onReject => {console.error(onReject)});
+    }, onReject => {console.error(onReject)});
+});
+
 
 app.listen((process.env.PORT || 5000), () => console.log('Example app listening on port ' + (process.env.PORT || 5000)));
 
