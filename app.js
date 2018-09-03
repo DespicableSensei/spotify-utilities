@@ -6,6 +6,7 @@ const path = require("path")
 const request = require("request")
 const sharp = require("sharp")
 var morgan = require('morgan')
+let moment = require("moment")
 var SpotifyWebApi = require("spotify-web-api-node")
 
 const app = express();
@@ -206,25 +207,32 @@ app.get("/your_playlist_will_be_ready_very_soon", (req,res) => {
     let optionsArray = timeFrames.map(time => {return {"limit": 50, "offset": 0, "time_range": time}});
     let promiseArray = optionsArray.map(opt => spotifyApi.getMyTopTracks(opt));
     Promise.all(promiseArray).then(onFullfill => {
-        let itemsByLists = onFullfill.map(d => d.body.items.map((i,index) => {return {id: i.id, index: index}}));
+        let itemsByLists = onFullfill.map(d => d.body.items.map((i,index) => {return {id: i.id, index: index, name: i.name}}));
         let evaluatedTracks = [];
 
-        itemsByLists.forEach((list,listIndex) => list.forEach(item => {
+        itemsByLists.forEach((list,listIndex) => list.forEach((item,itemIndex) => {
             var trackInPlaylist = evaluatedTracks.find(x => x.id === item.id);
             if(trackInPlaylist) {
-                trackInPlaylist.score += (50 - item.index) * (listIndex + 1);
+                trackInPlaylist.score += calcScore(item.index, listIndex);
                 trackInPlaylist.existsIn.push(listIndex + 1);
             }
             else {
-                var evaluatedTrack = Object.assign(item,{score: (50 - item.index) * (listIndex + 1), existsIn: [listIndex + 1]})
+                var evaluatedTrack = Object.assign(item,{score: calcScore(item.index, listIndex), existsIn: [listIndex + 1]})
                 evaluatedTracks.push(evaluatedTrack);
+            }
+            if((listIndex + 1 === itemsByLists.length) && (itemIndex + 1 === list.length)) {
+                evaluatedTracks.map(track => {
+                    track.score *= track.existsIn.reduce((a,v) => a + (v+1)) * 2;
+                })
             }
         }));
 
-        let playlistTracks = evaluatedTracks.sort((a,b) => b.score - a.score).slice(0,50).map(track => "spotify:track:" + track.id);
-        let description = "zaman ağırlıklı ortalama gibi düşünebilirsin bu listeyi. matematiksel olarak en çok açmak isteyebileceğin sıradalar.";
+        let playlistTracks = evaluatedTracks.sort((a,b) => b.score - a.score).slice(0,50)
+        let playlistUris = playlistTracks.map(track => "spotify:track:" + track.id);
+        let description = "zaman ağırlıklı ortalama gibi düşünebilirsin bu listeyi. matematiksel olarak en çok açmak isteyebileceğin sıradalar. " + moment().format("DD.MM.YYYY").toString();
         spotifyApi.createPlaylist(me,name,{public: true, description: description}).then(newPlaylist => {
-            spotifyApi.addTracksToPlaylist(me,newPlaylist.body.id,playlistTracks).then(tracksAdded => {
+            spotifyApi.addTracksToPlaylist(me,newPlaylist.body.id,playlistUris).then(tracksAdded => {
+                console.log(playlistTracks);
                 //Adding a cover image.
                 fs.createReadStream(path.join(__dirname + "/public/image/top.jpeg"), {encoding: "base64"}).pipe(
                     request.put(`https://api.spotify.com/v1/users/${me}/playlists/${newPlaylist.body.id}/images`,{headers: {"Authorization": "Bearer " + token, "Content-Type": "image/jpeg"}}, () => {
@@ -250,3 +258,7 @@ Array.prototype.shuffle = function () {
     }
     return this;
 };
+
+function calcScore(ti,li) {
+    return (50-ti)*(3-li);
+}
