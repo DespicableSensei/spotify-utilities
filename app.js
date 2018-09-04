@@ -6,6 +6,7 @@ const path = require("path")
 const request = require("request")
 const sharp = require("sharp")
 let moment = require("moment")
+var firebase = require("firebase")
 var morgan = require('morgan')
 var SpotifyWebApi = require("spotify-web-api-node")
 
@@ -14,6 +15,18 @@ const app = express();
 app.use(morgan('dev'));
 app.use(fileUpload());
 app.use('/static', express.static(path.join(__dirname, 'public')))
+
+var config = {
+    apiKey: process.env.FIREBASE_API,
+    authDomain: "spotify-utils.firebaseapp.com",
+    databaseURL: "https://spotify-utils.firebaseio.com",
+    projectId: "spotify-utils",
+    storageBucket: "spotify-utils.appspot.com",
+    messagingSenderId: "505597005023"
+  };
+firebase.initializeApp(config);
+
+const db = firebase.database();
 
 var spotifyApi = new SpotifyWebApi({
     clientId: process.env.CLIENT_ID,
@@ -37,7 +50,11 @@ app.get("/gotcode", async (req, res) => {
         spotifyApi.setAccessToken(d.body['access_token']);
         spotifyApi.setRefreshToken(d.body['refresh_token']);
     }, err => console.log(err));
-    spotifyApi.getMe().then(x => me = x.body.id,err => res.send(Object.assign(err,{source:"/gotcode getMe"})));
+    spotifyApi.getMe().then(x => {
+        me = x.body.id;
+        console.log(x.body);
+        db.ref("users/" + me).set({info: x.body}, y => console.log(y))
+    },err => res.send(Object.assign(err,{source:"/gotcode getMe"})));
     if(req.query.state === "c50") {
         res.redirect("/your_playlist_will_be_ready_very_soon")
     }
@@ -229,13 +246,14 @@ app.get("/your_playlist_will_be_ready_very_soon", (req,res) => {
 
         let playlistTracks = evaluatedTracks.sort((a,b) => b.score - a.score).slice(0,50)
         let playlistUris = playlistTracks.map(track => "spotify:track:" + track.id);
-        let description = `<a href="https://spotifyutils.herokuapp.com/c50">Kümülatif 50</a>'yi zaman ağırlıklı ortalama gibi düşünebilirsin. matematiksel olarak en çok açmak isteyebileceğin sıradalar. ` + moment().format("[DD.MM.YYYY]").toString();
+        let description = `Kümülatif 50'yi zaman ağırlıklı ortalama gibi düşünebilirsin. matematiksel olarak en çok açmak isteyebileceğin sıradalar. ` + moment().format("[DD.MM.YYYY]").toString();
         spotifyApi.createPlaylist(me,name,{public: true, description: description}).then(newPlaylist => {
             spotifyApi.addTracksToPlaylist(me,newPlaylist.body.id,playlistUris).then(tracksAdded => {
-                console.log(playlistTracks);
+                //console.log(playlistTracks);
                 //Adding a cover image.
                 fs.createReadStream(path.join(__dirname + "/public/image/top.jpeg"), {encoding: "base64"}).pipe(
                     request.put(`https://api.spotify.com/v1/users/${me}/playlists/${newPlaylist.body.id}/images`,{headers: {"Authorization": "Bearer " + token, "Content-Type": "image/jpeg"}}, () => {
+                        //db.ref("users/" + me).set()
                         res.render("coverpage", {name:name,url:newPlaylist.body.external_urls.spotify,img:"top"});
                     })
                 );
