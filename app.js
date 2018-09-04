@@ -246,7 +246,7 @@ app.get("/your_playlist_will_be_ready_very_soon", (req,res) => {
 
         let playlistTracks = evaluatedTracks.sort((a,b) => b.score - a.score).slice(0,50)
         let playlistUris = playlistTracks.map(track => "spotify:track:" + track.id);
-        let description = `Kümülatif 50'yi zaman ağırlıklı ortalama gibi düşünebilirsin. matematiksel olarak en çok açmak isteyebileceğin sıradalar. ` + moment().format("[DD.MM.YYYY]").toString();
+        let description = `Kümülatif 50'yi zaman ağırlıklı ortalama gibi düşünebilirsin. matematiksel olarak en çok açmak isteyebileceğin sıradalar. ` + moment().format("DD.MM.YYYY").toString();
         spotifyApi.createPlaylist(me,name,{public: true, description: description}).then(newPlaylist => {
             spotifyApi.addTracksToPlaylist(me,newPlaylist.body.id,playlistUris).then(tracksAdded => {
                 //console.log(playlistTracks);
