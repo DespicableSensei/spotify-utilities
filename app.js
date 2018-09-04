@@ -26,7 +26,7 @@ var config = {
   };
 firebase.initializeApp(config);
 
-const db = firebase.database();
+let db = firebase.database();
 
 var spotifyApi = new SpotifyWebApi({
     clientId: process.env.CLIENT_ID,
@@ -53,7 +53,7 @@ app.get("/gotcode", async (req, res) => {
     spotifyApi.getMe().then(x => {
         me = x.body.id;
         console.log(x.body);
-        db.ref("users/" + me).set({info: x.body}, y => console.log(y))
+        db.ref("users/" + me + "/info").set(x.body, y => console.log(y))
     },err => res.send(Object.assign(err,{source:"/gotcode getMe"})));
     if(req.query.state === "c50") {
         res.redirect("/your_playlist_will_be_ready_very_soon")
@@ -246,14 +246,15 @@ app.get("/your_playlist_will_be_ready_very_soon", (req,res) => {
 
         let playlistTracks = evaluatedTracks.sort((a,b) => b.score - a.score).slice(0,50)
         let playlistUris = playlistTracks.map(track => "spotify:track:" + track.id);
-        let description = `Kümülatif 50'yi zaman ağırlıklı ortalama gibi düşünebilirsin. matematiksel olarak en çok açmak isteyebileceğin sıradalar. ` + moment().format("DD.MM.YYYY").toString();
+        let playlistDate = moment().format("DD.MM.YYYY").toString();
+        let description = `Kümülatif 50'yi zaman ağırlıklı ortalama gibi düşünebilirsin. matematiksel olarak en çok açmak isteyebileceğin sıradalar. ` + playlistDate;
         spotifyApi.createPlaylist(me,name,{public: true, description: description}).then(newPlaylist => {
             spotifyApi.addTracksToPlaylist(me,newPlaylist.body.id,playlistUris).then(tracksAdded => {
                 //console.log(playlistTracks);
                 //Adding a cover image.
                 fs.createReadStream(path.join(__dirname + "/public/image/top.jpeg"), {encoding: "base64"}).pipe(
                     request.put(`https://api.spotify.com/v1/users/${me}/playlists/${newPlaylist.body.id}/images`,{headers: {"Authorization": "Bearer " + token, "Content-Type": "image/jpeg"}}, () => {
-                        //db.ref("users/" + me).set()
+                        db.ref("users/" + me + "/generated-playlists").push({tracks: playlistTracks, date: playlistDate, description: description, url: newPlaylist.body.external_urls.spotify});
                         res.render("coverpage", {name:name,url:newPlaylist.body.external_urls.spotify,img:"top"});
                     })
                 );
@@ -263,7 +264,7 @@ app.get("/your_playlist_will_be_ready_very_soon", (req,res) => {
 });
 
 
-app.listen((process.env.PORT || 5000), () => console.log('Example app listening on port ' + (process.env.PORT || 5000)));
+app.listen((process.env.PORT || 5000), () => console.log('App listening on port ' + (process.env.PORT || 5000)));
 
 Array.prototype.shuffle = function () {
     var len = this.length;
