@@ -56,8 +56,8 @@ a.links {
     background-color: rgba(0, 0, 0, 0.2);
     color: white;
     width: 256px;
-    border-top-left-radius: 2px;
-    border-top-right-radius: 2px;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
 }
 
 h2 {
