@@ -55,9 +55,11 @@ a.links {
     right: 0;
     background-color: rgba(0, 0, 0, 0.2);
     color: white;
-    width: 256px;
+    font-size: 24pt;
     border-top-left-radius: 5px;
     border-top-right-radius: 5px;
+    width: 40%;
+    line-height: 0px;
 }
 
 h2 {
