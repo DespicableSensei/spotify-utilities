@@ -223,7 +223,9 @@ app.get("/your_playlist_will_be_ready_very_soon", (req,res) => {
     let timeFrames = ["long_term", "medium_term", "short_term"];
     let optionsArray = timeFrames.map(time => {return {"limit": 50, "offset": 0, "time_range": time}});
     let promiseArray = optionsArray.map(opt => spotifyApi.getMyTopTracks(opt));
+    let pureData;
     Promise.all(promiseArray).then(onFullfill => {
+        pureData = onFullfill.map(y => y.body);
         let itemsByLists = onFullfill.map(d => d.body.items.map((i,index) => {return {id: i.id, index: index, name: i.name}}));
         let evaluatedTracks = [];
 
@@ -255,6 +257,8 @@ app.get("/your_playlist_will_be_ready_very_soon", (req,res) => {
                 fs.createReadStream(path.join(__dirname + "/public/image/top.jpeg"), {encoding: "base64"}).pipe(
                     request.put(`https://api.spotify.com/v1/users/${me}/playlists/${newPlaylist.body.id}/images`,{headers: {"Authorization": "Bearer " + token, "Content-Type": "image/jpeg"}}, () => {
                         db.ref("users/" + me + "/generated-playlists").push({tracks: playlistTracks, date: playlistDate, description: description, url: newPlaylist.body.external_urls.spotify});
+                        pureData.Date = playlistDate;
+                        db.ref("users/" + me + "/collected-data").push(pureData);
                         res.render("coverpage", {name:name,url:newPlaylist.body.external_urls.spotify,img:"top"});
                     })
                 );
