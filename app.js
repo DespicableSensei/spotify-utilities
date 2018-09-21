@@ -297,6 +297,7 @@ app.post('/utilities/uploader', function(req, res) {
 });
 
 app.get("/playlistin-neredeyse-hazir-olmak-uzere", (req,res) => {
+    let myDBname = me.replace(/[.$#\]\[]/g,"");
     spotifyApi.getMyTopArtists({ time_range: "long_term", limit: 5 }).then(myTopArtists => {
         let collectedData = myTopArtists;
         let topArtists = myTopArtists.body.items;
@@ -322,9 +323,9 @@ app.get("/playlistin-neredeyse-hazir-olmak-uzere", (req,res) => {
                         spotifyApi.addTracksToPlaylist(me, newPlaylist.body.id, trackUris).then(tracksAdded => {
                             fs.createReadStream(path.join(__dirname + "/public/image/fresh.jpeg"), { encoding: "base64" }).pipe(
                                 request.put(`https://api.spotify.com/v1/users/${me}/playlists/${newPlaylist.body.id}/images`, { headers: { "Authorization": "Bearer " + token, "Content-Type": "image/jpeg" } }, () => {
-                                    db.ref("users/" + me + "/generated-playlists").push({ type: "fresh", tracks: addedTopTracks, date: playlistDate, description: playlistDescription, url: newPlaylist.body.external_urls.spotify });
+                                    db.ref("users/" + myDBname + "/generated-playlists").push({ type: "fresh", tracks: addedTopTracks, date: playlistDate, description: playlistDescription, url: newPlaylist.body.external_urls.spotify });
                                     collectedData.Date = playlistDate;
-                                    db.ref("users/" + me + "/collected-data").push(collectedData);
+                                    db.ref("users/" + myDBname + "/collected-data").push(collectedData);
                                     res.render("coverpage", { name: playlistName, url: newPlaylist.body.external_urls.spotify, img: "fresh" });
                                 })
                             );
@@ -347,6 +348,7 @@ app.get("/a50", (req,res) => {
 });
 
 app.get("/your_playlist_will_be_ready_very_soon", (req,res) => {
+    let myDBname = me.replace(/[.$#\]\[]/g, "");
     let name = "Kümülatif 50";
     let timeFrames = ["long_term", "medium_term", "short_term"];
     let optionsArray = timeFrames.map(time => {return {"limit": 50, "offset": 0, "time_range": time}});
@@ -384,9 +386,9 @@ app.get("/your_playlist_will_be_ready_very_soon", (req,res) => {
                 //Adding a cover image.
                 fs.createReadStream(path.join(__dirname + "/public/image/top.jpeg"), {encoding: "base64"}).pipe(
                     request.put(`https://api.spotify.com/v1/users/${me}/playlists/${newPlaylist.body.id}/images`,{headers: {"Authorization": "Bearer " + token, "Content-Type": "image/jpeg"}}, () => {
-                        db.ref("users/" + me + "/generated-playlists").push({type: "kümülatif", tracks: playlistTracks, date: playlistDate, description: description, url: newPlaylist.body.external_urls.spotify});
+                        db.ref("users/" + myDBname + "/generated-playlists").push({type: "kümülatif", tracks: playlistTracks, date: playlistDate, description: description, url: newPlaylist.body.external_urls.spotify});
                         pureData.Date = playlistDate;
-                        db.ref("users/" + me + "/collected-data").push(pureData);
+                        db.ref("users/" + myDBname + "/collected-data").push(pureData);
                         res.render("coverpage", {name:name,url:newPlaylist.body.external_urls.spotify,img:"top"});
                     })
                 );
