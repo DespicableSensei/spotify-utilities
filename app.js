@@ -38,9 +38,9 @@ var scopes = ['user-read-private', 'user-read-email', 'user-library-read', 'play
 
 var authorizeURL = spotifyApi.createAuthorizeURL(scopes);
 
-let me,token;
+let me,token, curData;
 
-let curData = JSON.parse(fs.readFileSync("data12092018.json")).users;
+if (!process.env.HEROKU) { curData = JSON.parse(fs.readFileSync("data12092018.json")).users }
 
 app.set('view engine', 'pug');
 
