@@ -40,6 +40,8 @@ var authorizeURL = spotifyApi.createAuthorizeURL(scopes);
 
 let me,token;
 
+let curData = JSON.parse(fs.readFileSync("data12092018.json")).users;
+
 app.set('view engine', 'pug');
 
 app.get('/', (req, res) => res.send("<a href=" + authorizeURL + ">Login to Spotify</a>"));
@@ -52,15 +54,18 @@ app.get("/gotcode", async (req, res) => {
     }, err => console.log(err));
     spotifyApi.getMe().then(x => {
         me = x.body.id;
-        console.log(x.body);
         db.ref("users/" + me + "/info").set(x.body, y => console.log(y))
+
+        if (req.query.state === "c50") {
+            res.redirect("/your_playlist_will_be_ready_very_soon")
+        }
+        else if (req.query.state === "a50") {
+            res.redirect("playlistin-neredeyse-hazir-olmak-uzere");
+        }
+        else {
+            res.send(`<p>You have logged in with: ${req.query.code}</p><a href="/utilities">Utilities</a>`);
+        }
     },err => res.send(Object.assign(err,{source:"/gotcode getMe"})));
-    if(req.query.state === "c50") {
-        res.redirect("/your_playlist_will_be_ready_very_soon")
-    }
-    else {
-        res.send(`<p>You have logged in with: ${req.query.code}</p><a href="/utilities">Utilities</a>`);
-    }
 });
 
 app.get("/utilities", (req,res) => {
@@ -193,6 +198,84 @@ app.get("/utilities/allplaylistsongs", (req,res) => {
     }, err => console.log(err))
 });
 
+app.get("/utilities/recengine1", (req,res) => {
+    spotifyApi.getMyTopTracks({time_range: "short_term", limit: 50}).then(myTop => {
+        //let myTopUris = myTopFive.body.items.map(item => item.uri);
+        let myTopIds = myTop.body.items.map(item => item.id);
+        let myTopNames = myTop.body.items.map(item => item.name).join();
+
+        spotifyApi.getAudioFeaturesForTracks(myTopIds).then(audioFeatures => {
+            let avgTempo = audioFeatures.body.audio_features.reduce((a, c) => a + c.tempo, 0) / myTop.body.items.length;
+            let avgEnergy = audioFeatures.body.audio_features.reduce((a, c) => a + c.energy, 0) / myTop.body.items.length;
+            let recommendationOptions = { seed_tracks: myTopIds.shuffle().slice(0, 5), min_tempo: avgTempo, min_energy: avgEnergy };
+            spotifyApi.getRecommendations(recommendationOptions).then(recs => {
+                spotifyApi.createPlaylist(me, "RecEngine", { description: JSON.stringify(recommendationOptions)}).then(newPlaylist => {
+                    let trackUris = recs.body.tracks.map(r => r.uri)
+                    spotifyApi.addTracksToPlaylist(me, newPlaylist.body.id, trackUris).then(tracksAdded => {
+                        res.send(recs.body.seeds);
+                    })
+                })
+            }, err => console.error(err))
+        });
+    })
+});
+
+app.get("/utilities/recengine2", (req,res) => {
+    spotifyApi.getMyTopArtists({time_range: "long_term", limit: 5}).then(myTopArtists => {
+        let topArtists = myTopArtists.body.items;
+        let topArtistIds = topArtists.map(artist => artist.id);
+        let topTracksPromises = topArtistIds.map(id => spotifyApi.getArtistTopTracks(id,"TR"));
+
+        Promise.all(topTracksPromises).then(fulfillArray => {
+            let topTracksIds = fulfillArray.map(onFullfill => onFullfill.body.tracks.map(track => track.id))
+            let topTrackCheckPromises = topTracksIds.map(ids => spotifyApi.containsMySavedTracks(ids));
+            
+            Promise.all(topTrackCheckPromises).then(checkArray => {
+                let addedTopTrackIndexes = checkArray.map(check => check.body.findIndex(x => x === true))
+                let addedTopTrackIds = addedTopTrackIndexes.map((trackIndex, index) => topTracksIds[index][trackIndex]);
+                let recommendationOptions = { seed_tracks: addedTopTrackIds };
+                spotifyApi.getRecommendations(recommendationOptions).then(recs => {
+                    spotifyApi.createPlaylist(me, "RecEngine2", { description: JSON.stringify(recommendationOptions) }).then(newPlaylist => {
+                        let trackUris = recs.body.tracks.map(r => r.uri)
+                        spotifyApi.addTracksToPlaylist(me, newPlaylist.body.id, trackUris).then(tracksAdded => {
+                            res.send(recs.body.seeds);
+                        })
+                    })
+                }, err => console.error(err))
+            });
+        });
+    });
+});
+
+app.get("/utilities/songids", (req,res) => {
+    res.render("songlookup")
+});
+app.get("/utilities/songidlookup", (req,res) => {
+    let ids = JSON.parse(req.query.ids);
+    if(ids.length > 1 && typeof(ids) !== "string") {
+        spotifyApi.getTracks(ids).then(onFullfill => res.send(onFullfill), onReject => console.error(onReject))
+    }
+    else {
+        spotifyApi.getTrack(ids).then(onFullfill => res.send(onFullfill), onReject => console.error(onReject))
+    }
+});
+
+app.get("/utilities/allplaylistsongs", (req,res) => {
+    let requestedId = req.query.id;
+    spotifyApi.getPlaylistTracks(me,requestedId).then(alltracks => {
+        let count = alltracks.body.total;
+        let myLibrary = [];
+        for(var i = 0; i < count; i = i + 50) {
+            myLibrary.push(spotifyApi.getPlaylistTracks(me,requestedId,{limit: 50, offset: i}))
+        }
+
+        Promise.all(myLibrary).then(ff => {
+            let allItems = [].concat.apply([],ff.map(f => f.body.items));
+            res.send(allItems.map(i => i.track.name));
+        }, err => console.log(err));
+    }, err => console.log(err))
+});
+
 app.get("/utilities/uploadcover", (req,res) => {
     res.render("upload",{id: req.query.id});
 });
@@ -213,8 +296,53 @@ app.post('/utilities/uploader', function(req, res) {
     }).catch(err => console.error(err))
 });
 
+app.get("/playlistin-neredeyse-hazir-olmak-uzere", (req,res) => {
+    spotifyApi.getMyTopArtists({ time_range: "long_term", limit: 5 }).then(myTopArtists => {
+        let collectedData = myTopArtists;
+        let topArtists = myTopArtists.body.items;
+        let topArtistIds = topArtists.map(artist => artist.id);
+        let topTracksPromises = topArtistIds.map(id => spotifyApi.getArtistTopTracks(id, "TR"));
+
+        Promise.all(topTracksPromises).then(fulfillArray => {
+            let topTracksIds = fulfillArray.map(onFullfill => onFullfill.body.tracks.map(track => track.id))
+            let topTracks = fulfillArray.map(onFullfill => onFullfill.body.tracks);
+            let topTrackCheckPromises = topTracksIds.map(ids => spotifyApi.containsMySavedTracks(ids));
+
+            Promise.all(topTrackCheckPromises).then(checkArray => {
+                let addedTopTrackIndexes = checkArray.map(check => check.body.findIndex(x => x === true))
+                let addedTopTrackIds = addedTopTrackIndexes.map((trackIndex, index) => topTracksIds[index][trackIndex]);
+                let addedTopTracks = addedTopTrackIndexes.map((trackIndex, index) => topTracks[index][trackIndex]);
+                let recommendationOptions = { seed_tracks: addedTopTrackIds };
+                spotifyApi.getRecommendations(recommendationOptions).then(recs => {
+                    let playlistName = "fresh 20"
+                    let playlistDate = moment().format("DD.MM.YYYY").toString();
+                    let playlistDescription = JSON.stringify(recommendationOptions);
+                    spotifyApi.createPlaylist(me, playlistName, { description: playlistDescription}).then(newPlaylist => {
+                        let trackUris = recs.body.tracks.map(r => r.uri)
+                        spotifyApi.addTracksToPlaylist(me, newPlaylist.body.id, trackUris).then(tracksAdded => {
+                            fs.createReadStream(path.join(__dirname + "/public/image/fresh.jpeg"), { encoding: "base64" }).pipe(
+                                request.put(`https://api.spotify.com/v1/users/${me}/playlists/${newPlaylist.body.id}/images`, { headers: { "Authorization": "Bearer " + token, "Content-Type": "image/jpeg" } }, () => {
+                                    db.ref("users/" + me + "/generated-playlists").push({ type: "fresh", tracks: addedTopTracks, date: playlistDate, description: playlistDescription, url: newPlaylist.body.external_urls.spotify });
+                                    collectedData.Date = playlistDate;
+                                    db.ref("users/" + me + "/collected-data").push(collectedData);
+                                    res.render("coverpage", { name: playlistName, url: newPlaylist.body.external_urls.spotify, img: "fresh" });
+                                })
+                            );
+                        }, err => console.error(err))
+                    }, err => console.error(err))
+                }, err => console.error(err))
+            }, err => console.error(err));
+        }, err => console.error(err));
+    }, err => console.error(err));
+});
+
 app.get("/c50", (req,res) => {
     var aURL = spotifyApi.createAuthorizeURL(scopes,"c50");
+    res.redirect(aURL);
+});
+
+app.get("/a50", (req,res) => {
+    var aURL = spotifyApi.createAuthorizeURL(scopes,"a50");
     res.redirect(aURL);
 });
 
@@ -256,7 +384,7 @@ app.get("/your_playlist_will_be_ready_very_soon", (req,res) => {
                 //Adding a cover image.
                 fs.createReadStream(path.join(__dirname + "/public/image/top.jpeg"), {encoding: "base64"}).pipe(
                     request.put(`https://api.spotify.com/v1/users/${me}/playlists/${newPlaylist.body.id}/images`,{headers: {"Authorization": "Bearer " + token, "Content-Type": "image/jpeg"}}, () => {
-                        db.ref("users/" + me + "/generated-playlists").push({tracks: playlistTracks, date: playlistDate, description: description, url: newPlaylist.body.external_urls.spotify});
+                        db.ref("users/" + me + "/generated-playlists").push({type: "kümülatif", tracks: playlistTracks, date: playlistDate, description: description, url: newPlaylist.body.external_urls.spotify});
                         pureData.Date = playlistDate;
                         db.ref("users/" + me + "/collected-data").push(pureData);
                         res.render("coverpage", {name:name,url:newPlaylist.body.external_urls.spotify,img:"top"});
@@ -284,4 +412,36 @@ Array.prototype.shuffle = function () {
 
 function calcScore(ti,li) {
     return (50-ti)*(3-li);
+}
+
+function combinePlaylists(collectedDataArray) {
+    let uniqueSongObject = {};
+    collectedDataArray.forEach(collectedDataSet => {
+        collectedDataSet.forEach((timeframe, timeIndex) => {
+            timeframe.items.forEach((track, index) => {
+                var thisTrack = track;
+                thisTrack.score = calcScore(index, timeIndex);
+                if (!uniqueSongObject[track.id]) {
+                    uniqueSongObject[track.id] = Object.assign(track,{score: calcScore(index, timeIndex), existsIn: [timeIndex + 1]});
+                }
+                else {
+                    uniqueSongObject[track.id].score += thisTrack.score;
+                    uniqueSongObject[track.id].existsIn.push(timeIndex + 1);
+                }
+                if (timeIndex + 1 === collectedDataSet.length && index + 1 === timeframe.items.length) {
+                  uniqueSongObject = Object
+                    .keys(uniqueSongObject)
+                    .map(track => {
+                        let tra = uniqueSongObject[track];
+                        tra.score *=
+                            tra.existsIn.reduce(
+                          (a, v) => a + (v + 1)
+                        ) * 2;
+                        return tra
+                    });
+                }
+            });
+        });
+    });
+    return uniqueSongObject
 }
