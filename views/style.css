@@ -84,3 +84,32 @@ h3 {
     margin: 5px;
     padding: 2px;
 }
+
+.thumbdiv {
+    height: 64px;
+    width: 64px;
+    
+}
+
+img.thumb {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+}
+
+form.pickermain  {
+    display: flex;
+    justify-content: space-evenly;
+    width: 100vw;
+}
+.pick {
+    display: inline-flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin: 5px;
+}
+.picktext {
+    padding: 10px 0;
+    margin: 0 5px;
+    text-align: center;
+}

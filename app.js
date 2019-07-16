@@ -38,7 +38,7 @@ var scopes = ['user-read-private', 'user-read-email', 'user-library-read', 'play
 
 var authorizeURL = spotifyApi.createAuthorizeURL(scopes);
 
-let me,token, curData;
+let me, token, curData, myDBname;
 
 if (!process.env.HEROKU) { curData = JSON.parse(fs.readFileSync("data12092018.json")).users }
 
@@ -54,13 +54,20 @@ app.get("/gotcode", async (req, res) => {
     }, err => console.log(err));
     spotifyApi.getMe().then(x => {
         me = x.body.id;
-        db.ref("users/" + me + "/info").set(x.body, y => console.log(y))
+        myDBname = me.replace(/[.$#\]\[]/g, "");
+        db.ref("users/" + myDBname).set(x.body, y => console.log(y))
 
         if (req.query.state === "c50") {
             res.redirect("/your_playlist_will_be_ready_very_soon")
         }
         else if (req.query.state === "a50") {
             res.redirect("playlistin-neredeyse-hazir-olmak-uzere");
+        }
+        else if (req.query.state === "a50m") {
+            res.redirect("a50-picker");
+        }
+        else if (req.query.state === "e50") {
+            res.redirect("elli");
         }
         else {
             res.send(`<p>You have logged in with: ${req.query.code}</p><a href="/utilities">Utilities</a>`);
@@ -280,6 +287,33 @@ app.get("/utilities/uploadcover", (req,res) => {
     res.render("upload",{id: req.query.id});
 });
 
+app.get("/elli", (req, res) => {
+    spotifyApi.getMyTopArtists().then(onf => {
+        let taa = onf.body.items;
+        let pa = taa.map(ta => spotifyApi.getArtistTopTracks(ta.id, "TR"));
+        Promise.all(pa).then(resolve => {
+            let urs = resolve.map(x => x.body.tracks.map(y => y.uri));
+            let malo = [];
+            urs.forEach(ur => {
+                malo = malo.concat(ur);
+            })
+            let pn = "deneme";
+            spotifyApi.createPlaylist(me, pn, {public: false}).then(pc => {
+                spotifyApi.addTracksToPlaylist(me, pc.body.id, malo).then(tap => {
+                    res.render("coverpage", {
+                        name: pn,
+                        url:
+                            pc.body.external_urls
+                                .spotify,
+                        img: "fresh",
+                    });
+                })
+            })
+        })
+    })
+    res.send(":)")
+});
+
 app.post('/utilities/uploader', function(req, res) {
     let pid = req.query.id;
     let pif;
@@ -297,11 +331,12 @@ app.post('/utilities/uploader', function(req, res) {
 });
 
 app.get("/playlistin-neredeyse-hazir-olmak-uzere", (req,res) => {
-    let myDBname = me.replace(/[.$#\]\[]/g,"");
     spotifyApi.getMyTopArtists({ time_range: "long_term", limit: 5 }).then(myTopArtists => {
         let collectedData = myTopArtists;
         let topArtists = myTopArtists.body.items;
-        let topArtistIds = topArtists.map(artist => artist.id);
+        let topArtistIds;
+        if (req.query.artistids) topArtistIds = req.query.artistids;
+        else topArtistIds = topArtists.map(artist => artist.id);
         let topTracksPromises = topArtistIds.map(id => spotifyApi.getArtistTopTracks(id, "TR"));
 
         Promise.all(topTracksPromises).then(fulfillArray => {
@@ -310,7 +345,7 @@ app.get("/playlistin-neredeyse-hazir-olmak-uzere", (req,res) => {
             let topTrackCheckPromises = topTracksIds.map(ids => spotifyApi.containsMySavedTracks(ids));
 
             Promise.all(topTrackCheckPromises).then(checkArray => {
-                let addedTopTrackIndexes = checkArray.map(check => check.body.findIndex(x => x === true))
+                let addedTopTrackIndexes = checkArray.map(check => (check.body.findIndex(x => x === true) !== -1) ? check.body.findIndex(x => x === true):0)
                 let addedTopTrackIds = addedTopTrackIndexes.map((trackIndex, index) => topTracksIds[index][trackIndex]);
                 let addedTopTracks = addedTopTrackIndexes.map((trackIndex, index) => topTracks[index][trackIndex]);
                 let recommendationOptions = { seed_tracks: addedTopTrackIds };
@@ -323,9 +358,9 @@ app.get("/playlistin-neredeyse-hazir-olmak-uzere", (req,res) => {
                         spotifyApi.addTracksToPlaylist(me, newPlaylist.body.id, trackUris).then(tracksAdded => {
                             fs.createReadStream(path.join(__dirname + "/public/image/fresh.jpeg"), { encoding: "base64" }).pipe(
                                 request.put(`https://api.spotify.com/v1/users/${me}/playlists/${newPlaylist.body.id}/images`, { headers: { "Authorization": "Bearer " + token, "Content-Type": "image/jpeg" } }, () => {
-                                    db.ref("users/" + myDBname + "/generated-playlists").push({ type: "fresh", tracks: addedTopTracks, date: playlistDate, description: playlistDescription, url: newPlaylist.body.external_urls.spotify });
+                                    db.ref("generatedPlaylists/" + myDBname).push({ type: "fresh", tracks: addedTopTracks, date: playlistDate, description: playlistDescription, url: newPlaylist.body.external_urls.spotify });
                                     collectedData.Date = playlistDate;
-                                    db.ref("users/" + myDBname + "/collected-data").push(collectedData);
+                                    db.ref("collectedData/" + myDBname).push(collectedData);
                                     res.render("coverpage", { name: playlistName, url: newPlaylist.body.external_urls.spotify, img: "fresh" });
                                 })
                             );
@@ -342,13 +377,30 @@ app.get("/c50", (req,res) => {
     res.redirect(aURL);
 });
 
+app.get("/e50", (req,res) => {
+    var aURL = spotifyApi.createAuthorizeURL(scopes,"e50");
+    res.redirect(aURL);
+});
+
 app.get("/a50", (req,res) => {
     var aURL = spotifyApi.createAuthorizeURL(scopes,"a50");
     res.redirect(aURL);
 });
 
+app.get("/a50m", (req,res) => {
+    var aURL = spotifyApi.createAuthorizeURL(scopes,"a50m");
+    res.redirect(aURL);
+});
+
+app.get("/a50-picker", (req,res) => {
+    spotifyApi.getMyTopArtists({time_range: "long_term", limit: 50}).then(onFullfill => {
+        let pickerArray = onFullfill.body.items;
+        console.log(pickerArray[5].images)
+        res.render("picker", {pickerArray: pickerArray})
+    }, onReject => console.error(onReject))
+});
+
 app.get("/your_playlist_will_be_ready_very_soon", (req,res) => {
-    let myDBname = me.replace(/[.$#\]\[]/g, "");
     let name = "Kümülatif 50";
     let timeFrames = ["long_term", "medium_term", "short_term"];
     let optionsArray = timeFrames.map(time => {return {"limit": 50, "offset": 0, "time_range": time}});
@@ -386,9 +438,9 @@ app.get("/your_playlist_will_be_ready_very_soon", (req,res) => {
                 //Adding a cover image.
                 fs.createReadStream(path.join(__dirname + "/public/image/top.jpeg"), {encoding: "base64"}).pipe(
                     request.put(`https://api.spotify.com/v1/users/${me}/playlists/${newPlaylist.body.id}/images`,{headers: {"Authorization": "Bearer " + token, "Content-Type": "image/jpeg"}}, () => {
-                        db.ref("users/" + myDBname + "/generated-playlists").push({type: "kümülatif", tracks: playlistTracks, date: playlistDate, description: description, url: newPlaylist.body.external_urls.spotify});
+                        db.ref("generatedPlaylists/" + myDBname).push({type: "kümülatif", tracks: playlistTracks, date: playlistDate, description: description, url: newPlaylist.body.external_urls.spotify});
                         pureData.Date = playlistDate;
-                        db.ref("users/" + myDBname + "/collected-data").push(pureData);
+                        db.ref("collectedData/" + myDBname).push(pureData);
                         res.render("coverpage", {name:name,url:newPlaylist.body.external_urls.spotify,img:"top"});
                     })
                 );

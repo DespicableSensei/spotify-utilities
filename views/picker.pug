@@ -1,0 +1,13 @@
+doctype html
+head
+    style
+        include style.css
+body
+    form.pickermain(action='/playlistin-neredeyse-hazir-olmak-uzere', method="get")
+        each artist in pickerArray
+            div.pick
+                div.picktext
+                    input(type="checkbox", value=artist.id, name="artistids[]") 
+                    = artist.name
+                img.thumb(src=artist.images[artist.images.length-1].url, alt=artist.name)
+        input(type='submit', value='Submit')
