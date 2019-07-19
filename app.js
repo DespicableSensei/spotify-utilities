@@ -460,7 +460,7 @@ app.post("/api/combineUserPlaylists/", (req, res) => {
     } else {
         //get tracks in playlists
         let dbArray = userIdArray.map(userId => {
-            return db.ref("generatedPlaylists/" + userId).limitToLast(1).once("value")
+            return db.ref("generatedPlaylists/" + userId).equalTo("kümülatif", "type").limitToLast(1).once("value")
         })
         Promise.all(dbArray).then(
             onFullfill => {
