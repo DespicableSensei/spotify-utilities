@@ -8,6 +8,7 @@ const sharp = require("sharp")
 let moment = require("moment")
 var firebase = require("firebase")
 var morgan = require('morgan')
+var bodyParser = require("body-parser");
 var SpotifyWebApi = require("spotify-web-api-node")
 
 const app = express();
@@ -15,6 +16,7 @@ const app = express();
 app.use(morgan('dev'));
 app.use(fileUpload());
 app.use('/static', express.static(path.join(__dirname, 'public')))
+app.use(bodyParser.json());
 
 var config = {
     apiKey: process.env.FIREBASE_API,
@@ -40,7 +42,7 @@ var authorizeURL = spotifyApi.createAuthorizeURL(scopes);
 
 let me, token, curData, myDBname;
 
-if (!process.env.HEROKU) { curData = JSON.parse(fs.readFileSync("data12092018.json")).users }
+//if (!process.env.HEROKU) { curData = JSON.parse(fs.readFileSync("data12092018.json")).users }
 
 app.set('view engine', 'pug');
 
@@ -330,6 +332,8 @@ app.post('/utilities/uploader', function(req, res) {
     }).catch(err => console.error(err))
 });
 
+
+
 app.get("/playlistin-neredeyse-hazir-olmak-uzere", (req,res) => {
     spotifyApi.getMyTopArtists({ time_range: "long_term", limit: 5 }).then(myTopArtists => {
         let collectedData = myTopArtists;
@@ -449,6 +453,47 @@ app.get("/your_playlist_will_be_ready_very_soon", (req,res) => {
     }, onReject => {console.error(onReject)});
 });
 
+app.post("/api/combineUserPlaylists/", (req, res) => {
+    let userIdArray = req.body.userArray;
+    if (userIdArray.length > 5) {
+        res.send("TOO MANY USERS")
+    } else {
+        //get tracks in playlists
+        let dbArray = userIdArray.map(userId => {
+            return db.ref("generatedPlaylists/" + userId).limitToLast(1).once("value")
+        })
+        Promise.all(dbArray).then(
+            onFullfill => {
+                let trackArrays = onFullfill.map(x => {
+                    let playlistObject = x.val();
+                    let playlistKey = Object.keys(playlistObject)[0];
+                    let playlistTracks = playlistObject[playlistKey].tracks.filter(y => y.existsIn.length > 0);
+                    return playlistTracks
+                })
+                //combine duplicate tracks and add their scores
+                let flatArray = flattenDeep(trackArrays);
+                let combinePlaylists = {};
+                flatArray.forEach(t => {
+                    let thisTrack = t
+                    if (combinePlaylists[thisTrack.id]) {
+                        combinePlaylists[thisTrack.id].score += thisTrack.score
+                        combinePlaylists[thisTrack.id].existsIn = combinePlaylists[thisTrack.id].existsIn.concat(thisTrack.existsIn)
+                    } else {
+                        combinePlaylists[thisTrack.id] = thisTrack
+                    }
+                })
+                let combinedPlaylist = Object.keys(combinePlaylists).map(key => combinePlaylists[key])
+                //sort and slice
+                let finalArray = combinedPlaylist.sort((a, b) => b.score - a.score).slice(0, 50)
+                console.log(finalArray);
+                console.log(finalArray.length);
+                res.send(finalArray);
+            },
+            onReject => console.error(onReject)
+        );
+    }
+});
+
 
 app.listen((process.env.PORT || 5000), () => console.log('App listening on port ' + (process.env.PORT || 5000)));
 
@@ -466,6 +511,14 @@ Array.prototype.shuffle = function () {
 
 function calcScore(ti,li) {
     return (50-ti)*(3-li);
+}
+
+function flattenDeep(arr1) {
+    return arr1.reduce(
+        (acc, val) =>
+            Array.isArray(val) ? acc.concat(flattenDeep(val)) : acc.concat(val),
+        []
+    );
 }
 
 function combinePlaylists(collectedDataArray) {
