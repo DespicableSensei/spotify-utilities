@@ -456,7 +456,7 @@ app.get("/your_playlist_will_be_ready_very_soon", (req,res) => {
 app.post("/api/combineUserPlaylists/", (req, res) => {
     let userIdArray = req.body.userArray;
     if (userIdArray.length > 5) {
-        res.send("TOO MANY USERS")
+        res.end("TOO MANY USERS")
     } else {
         //get tracks in playlists
         let dbArray = userIdArray.map(userId => {
@@ -501,7 +501,7 @@ app.post("/api/combineUserPlaylists/", (req, res) => {
                         fs.createReadStream(path.join(__dirname + "/public/image/ortak.jpeg"), {encoding: "base64"}).pipe(
                             request.put(`https://api.spotify.com/v1/users/${me}/playlists/${newPlaylist.body.id}/images`,{headers: {"Authorization": "Bearer " + token, "Content-Type": "image/jpeg"}}, () => {
                                 db.ref("generatedPlaylists/" + myDBname).push({type: "ortak", tracks: finalArray, date: playlistDate, description: description, url: newPlaylist.body.external_urls.spotify});
-                                res.send(finalArray)
+                                res.end(finalArray)
                             })
                         )}, onReject => console.error(onReject)
                     )
