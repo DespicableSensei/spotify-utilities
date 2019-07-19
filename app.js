@@ -24,9 +24,11 @@ var config = {
     databaseURL: "https://spotify-utils.firebaseio.com",
     projectId: "spotify-utils",
     storageBucket: "spotify-utils.appspot.com",
-    messagingSenderId: "505597005023"
+    messagingSenderId: "505597005023",
   };
+
 firebase.initializeApp(config);
+//firebase.database.enableLogging(true);
 
 let db = firebase.database();
 
@@ -460,7 +462,12 @@ app.post("/api/combineUserPlaylists/", (req, res) => {
     } else {
         //get tracks in playlists
         let dbArray = userIdArray.map(userId => {
-            return db.ref("generatedPlaylists/" + userId).equalTo("kümülatif", "type").limitToLast(1).once("value")
+            return db
+                .ref("generatedPlaylists/" + userId)
+                .orderByChild("type")
+                .equalTo("kümülatif")
+                .limitToLast(1)
+                .once("value");
         })
         Promise.all(dbArray).then(
             onFullfill => {
@@ -489,8 +496,6 @@ app.post("/api/combineUserPlaylists/", (req, res) => {
                 })
                 //sort and slice
                 let finalArray = combinedPlaylist.sort((a, b) => b.score - a.score).slice(0, 50)
-                console.log(finalArray);
-                console.log(finalArray.length);
                 //create on spotify too 
                 let playlistDate = moment().format("DD.MM.YYYY").toString();
                 let description = userIdArray.join(", ") + " için yaratılan ortak playlist.";
@@ -504,11 +509,8 @@ app.post("/api/combineUserPlaylists/", (req, res) => {
                                 res.send(finalArray)
                             })
                         )}, onReject => console.error(onReject)
-                    )
-                }, onReject => console.error(onReject))
-            },
-            onReject => console.error(onReject)
-        );
+                    )}, onReject => console.error(onReject))
+            },onReject => console.error(onReject));
     }
 });
 
