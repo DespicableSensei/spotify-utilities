@@ -482,12 +482,30 @@ app.post("/api/combineUserPlaylists/", (req, res) => {
                         combinePlaylists[thisTrack.id] = thisTrack
                     }
                 })
-                let combinedPlaylist = Object.keys(combinePlaylists).map(key => combinePlaylists[key])
+                let combinedPlaylist = Object.keys(combinePlaylists).map(key => {
+                    let track = combinePlaylists[key]
+                    track.index = null
+                    return track
+                })
                 //sort and slice
                 let finalArray = combinedPlaylist.sort((a, b) => b.score - a.score).slice(0, 50)
                 console.log(finalArray);
                 console.log(finalArray.length);
-                res.send(finalArray);
+                //create on spotify too 
+                let playlistDate = moment().format("DD.MM.YYYY").toString();
+                let description = userIdArray.join(", ") + " için yaratılan ortak playlist.";
+                let playlistUris = finalArray.map(a => "spotify:track:" + a.id)
+                spotifyApi.createPlaylist(me,"Ortaklaşa",{public: true, description: description}).then(newPlaylist => {
+                    spotifyApi.addTracksToPlaylist(me,newPlaylist.body.id,playlistUris).then(tracksAdded => {
+                        //cover image 
+                        fs.createReadStream(path.join(__dirname + "/public/image/ortak.jpeg"), {encoding: "base64"}).pipe(
+                            request.put(`https://api.spotify.com/v1/users/${me}/playlists/${newPlaylist.body.id}/images`,{headers: {"Authorization": "Bearer " + token, "Content-Type": "image/jpeg"}}, () => {
+                                db.ref("generatedPlaylists/" + myDBname).push({type: "ortak", tracks: finalArray, date: playlistDate, description: description, url: newPlaylist.body.external_urls.spotify});
+                                res.send(finalArray)
+                            })
+                        )}, onReject => console.error(onReject)
+                    )
+                }, onReject => console.error(onReject))
             },
             onReject => console.error(onReject)
         );
