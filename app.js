@@ -505,8 +505,21 @@ app.post("/api/combineUserPlaylists/", (req, res) => {
                         //cover image 
                         fs.createReadStream(path.join(__dirname + "/public/image/ortak.jpeg"), {encoding: "base64"}).pipe(
                             request.put(`https://api.spotify.com/v1/users/${me}/playlists/${newPlaylist.body.id}/images`,{headers: {"Authorization": "Bearer " + token, "Content-Type": "image/jpeg"}}, () => {
-                                db.ref("generatedPlaylists/" + myDBname).push({type: "ortak", tracks: finalArray, date: playlistDate, description: description, url: newPlaylist.body.external_urls.spotify});
-                                res.send(finalArray)
+                                let dbId = db.ref("generatedPlaylists/" + myDBname).push().key;
+                                let toPush = {
+                                    id : dbId,
+                                    type:
+                                        "ortak",
+                                    tracks: finalArray,
+                                    date: playlistDate,
+                                    description: description,
+                                    url:
+                                        newPlaylist
+                                            .body
+                                            .external_urls
+                                            .spotify,
+                                };
+                                res.send(toPush)
                             })
                         )}, onReject => console.error(onReject)
                     )}, onReject => console.error(onReject))
