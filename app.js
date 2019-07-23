@@ -491,7 +491,7 @@ app.post("/api/combineUserPlaylists/", (req, res) => {
                 })
                 let combinedPlaylist = Object.keys(combinePlaylists).map(key => {
                     let track = combinePlaylists[key]
-                    track.index = null
+                    delete track.index
                     return track
                 })
                 //sort and slice
