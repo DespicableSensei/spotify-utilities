@@ -519,6 +519,7 @@ app.post("/api/combineUserPlaylists/", (req, res) => {
                                             .external_urls
                                             .spotify,
                                 };
+                                db.ref("generatedPlaylists/" + myDBname).push(toPush);
                                 res.send(toPush)
                             })
                         )}, onReject => console.error(onReject)
