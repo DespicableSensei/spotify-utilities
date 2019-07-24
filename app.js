@@ -460,36 +460,16 @@ app.get("/playlistsil", (req, res) => {
     spotifyApi.getUserPlaylists({limit: 1}).then(onFullfill => {
         totalPlaylists = onFullfill.body.total
         console.log(totalPlaylists);
-        let promises = [];
-        for(var i = 0; i < Math.ceil(totalPlaylists / 50); i++) {
-            let newPromise = spotifyApi
-                .getUserPlaylists({ limit: 50 })
-                .then(
-                    onFullfill => {
-                        let playlistIdArray = onFullfill.body.items
-                            .filter(
-                                item => item.name == "Ortaklaşa"
-                            )
-                            .map(item => item.id)
-                            .map(itemid => {
-                                return spotifyApi.unfollowPlaylist(
-                                    itemid
-                                );
-                            });
-                        Promise.all(playlistIdArray).then(p => {
-                            p.forEach(d => {
-                                console.log(d.body);
-                            });
-                        });
-                    },
-                    onReject => console.error(onReject)
-                );
-            promises.push(newPromise)
-        }
-        Promise.all(promises).then(onFullfill => onFullfill.forEach(f => {
-            console.log(f)
-            res.send(":)")
-        }), onReject => console.error(onReject))
+        setInterval(deletePlaylists(), 200)
+        // let promises = [];
+        // for(var i = 0; i < Math.ceil(totalPlaylists / 50); i++) {
+        //     let newPromise = deletePlaylists()
+        //     promises.push(newPromise)
+        // }
+        // Promise.all(promises).then(onFullfill => onFullfill.forEach(f => {
+        //     console.log(f)
+        //     res.send(":)")
+        // }), onReject => console.error(onReject))
     }, onReject => console.error(onReject))
 })
 
@@ -590,6 +570,26 @@ function flattenDeep(arr1) {
         (acc, val) =>
             Array.isArray(val) ? acc.concat(flattenDeep(val)) : acc.concat(val),
         []
+    );
+}
+
+function deletePlaylists() {
+    return spotifyApi.getUserPlaylists({ limit: 50 }).then(
+        onFullfill => {
+            console.log(onFullfill.body.total)
+            let playlistIdArray = onFullfill.body.items
+                .filter(item => item.name == "Ortaklaşa")
+                .map(item => item.id)
+                .map(itemid => {
+                    return spotifyApi.unfollowPlaylist(itemid);
+                });
+            Promise.all(playlistIdArray).then(p => {
+                p.forEach(d => {
+                    console.log(d.body);
+                });
+            });
+        },
+        onReject => console.error(onReject)
     );
 }
 
