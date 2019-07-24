@@ -457,7 +457,7 @@ app.get("/your_playlist_will_be_ready_very_soon", (req,res) => {
 
 app.get("/playlistsil", (req, res) => {
     let totalPlaylists;
-    spotifyApi.getUserPlaylists({limit: 50}).then(onFullfill => {
+    spotifyApi.getUserPlaylists({limit: 50, offset:2000}).then(onFullfill => {
         totalPlaylists = onFullfill.body.total
         console.log(totalPlaylists);
         console.log(onFullfill.body.items)
@@ -469,7 +469,7 @@ app.get("/playlistsil", (req, res) => {
             setTimeout(() => {
                 spotifyApi.unfollowPlaylist(playlistIdArray[i]).then(onFullfill => {
                     console.log(onFullfill)
-                }, onReject => console.error(onReject))
+                }, onReject => console.error("emre", onReject))
             }, 200)
         }
         res.send(":)")
@@ -483,6 +483,12 @@ app.get("/playlistsil", (req, res) => {
         //     res.send(":)")
         // }), onReject => console.error(onReject))
     }, onReject => console.error(onReject))
+})
+
+app.get("/beo", (req, res) => {
+    spotifyApi.unfollowPlaylist("4QD689aFQjPiOOyxKI3NBS").then(f => {
+        console.log(f)
+    }, r => console.error(r))
 })
 
 app.post("/api/combineUserPlaylists/", (req, res) => {
