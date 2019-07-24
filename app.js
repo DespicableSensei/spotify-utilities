@@ -460,9 +460,11 @@ app.get("/playlistsil", (req, res) => {
     spotifyApi.getUserPlaylists({limit: 50}).then(onFullfill => {
         totalPlaylists = onFullfill.body.total
         console.log(totalPlaylists);
+        console.log(onFullfill.body.items)
         let playlistIdArray = onFullfill.body.items
             .filter(item => item.name == "Ortaklaşa")
             .map(item => item.id);
+        console.log(playlistIdArray)
         for(var i = 0; i < 50; i++) {
             setTimeout(() => {
                 spotifyApi.unfollowPlaylist(playlistIdArray[i]).then(onFullfill => {
