@@ -465,7 +465,9 @@ app.get("/playlistsil", (req, res) => {
             .map(item => item.id);
         for(var i = 0; i < 50; i++) {
             setTimeout(() => {
-                spotifyApi.unfollowPlaylist(playlistIdArray[i])
+                spotifyApi.unfollowPlaylist(playlistIdArray[i]).then(onFullfill => {
+                    console.log(onFullfill)
+                }, onReject => console.error(onReject))
             }, 200)
         }
         res.send(":)")
