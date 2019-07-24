@@ -457,10 +457,18 @@ app.get("/your_playlist_will_be_ready_very_soon", (req,res) => {
 
 app.get("/playlistsil", (req, res) => {
     let totalPlaylists;
-    spotifyApi.getUserPlaylists({limit: 1}).then(onFullfill => {
+    spotifyApi.getUserPlaylists({limit: 50}).then(onFullfill => {
         totalPlaylists = onFullfill.body.total
         console.log(totalPlaylists);
-        setInterval(deletePlaylists.bind(this, 5), 500)
+        let playlistIdArray = onFullfill.body.items
+            .filter(item => item.name == "Ortaklaşa")
+            .map(item => item.id);
+        for(var i = 0; i < 50; i++) {
+            setTimeout(() => {
+                spotifyApi.unfollowPlaylist(playlistIdArray[i])
+            }, 200)
+        }
+        res.send(":)")
         // let promises = [];
         // for(var i = 0; i < Math.ceil(totalPlaylists / 50); i++) {
         //     let newPromise = deletePlaylists()
@@ -587,7 +595,7 @@ function deletePlaylists(limit) {
                 p.forEach(d => {
                     console.log(d.body);
                 });
-            });
+            }, onReject => console.error(onReject));
         },
         onReject => console.error(onReject)
     );
