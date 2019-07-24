@@ -455,6 +455,44 @@ app.get("/your_playlist_will_be_ready_very_soon", (req,res) => {
     }, onReject => {console.error(onReject)});
 });
 
+app.get("/playlistsil", (req, res) => {
+    let totalPlaylists;
+    spotifyApi.getUserPlaylists({limit: 1}).then(onFullfill => {
+        totalPlaylists = onFullfill.body.total
+        console.log(totalPlaylists);
+        let promises = [];
+        for(var i = 0; i < Math.ceil(totalPlaylists / 50); i++) {
+            let newPromise = spotifyApi
+                .getUserPlaylists({ limit: 50 })
+                .then(
+                    onFullfill => {
+                        let playlistIdArray = onFullfill.body.items
+                            .filter(
+                                item => item.name == "Ortaklaşa"
+                            )
+                            .map(item => item.id)
+                            .map(itemid => {
+                                return spotifyApi.unfollowPlaylist(
+                                    itemid
+                                );
+                            });
+                        Promise.all(playlistIdArray).then(p => {
+                            p.forEach(d => {
+                                console.log(d.body);
+                            });
+                        });
+                    },
+                    onReject => console.error(onReject)
+                );
+            promises.push(newPromise)
+        }
+        Promise.all(promises).then(onFullfill => onFullfill.forEach(f => {
+            console.log(f)
+            res.send(":)")
+        }), onReject => console.error(onReject))
+    }, onReject => console.error(onReject))
+})
+
 app.post("/api/combineUserPlaylists/", (req, res) => {
     let userIdArray = req.body.userArray;
     if (userIdArray.length > 5) {
