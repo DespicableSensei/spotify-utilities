@@ -460,7 +460,7 @@ app.get("/playlistsil", (req, res) => {
     spotifyApi.getUserPlaylists({limit: 1}).then(onFullfill => {
         totalPlaylists = onFullfill.body.total
         console.log(totalPlaylists);
-        setInterval(deletePlaylists(), 200)
+        setInterval(deletePlaylists, 200)
         // let promises = [];
         // for(var i = 0; i < Math.ceil(totalPlaylists / 50); i++) {
         //     let newPromise = deletePlaylists()
