@@ -291,33 +291,6 @@ app.get("/utilities/uploadcover", (req,res) => {
     res.render("upload",{id: req.query.id});
 });
 
-app.get("/elli", (req, res) => {
-    spotifyApi.getMyTopArtists().then(onf => {
-        let taa = onf.body.items;
-        let pa = taa.map(ta => spotifyApi.getArtistTopTracks(ta.id, "TR"));
-        Promise.all(pa).then(resolve => {
-            let urs = resolve.map(x => x.body.tracks.map(y => y.uri));
-            let malo = [];
-            urs.forEach(ur => {
-                malo = malo.concat(ur);
-            })
-            let pn = "deneme";
-            spotifyApi.createPlaylist(me, pn, {public: false}).then(pc => {
-                spotifyApi.addTracksToPlaylist(me, pc.body.id, malo).then(tap => {
-                    res.render("coverpage", {
-                        name: pn,
-                        url:
-                            pc.body.external_urls
-                                .spotify,
-                        img: "fresh",
-                    });
-                })
-            })
-        })
-    })
-    res.send(":)")
-});
-
 app.post('/utilities/uploader', function(req, res) {
     let pid = req.query.id;
     let pif;
