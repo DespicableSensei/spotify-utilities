@@ -528,26 +528,6 @@ function flattenDeep(arr1) {
     );
 }
 
-function deletePlaylists(limit) {
-    return spotifyApi.getUserPlaylists({ limit: limit }).then(
-        onFullfill => {
-            console.log(onFullfill.body.total)
-            let playlistIdArray = onFullfill.body.items
-                .filter(item => item.name == "Ortaklaşa")
-                .map(item => item.id)
-                .map(itemid => {
-                    return spotifyApi.unfollowPlaylist(itemid);
-                });
-            Promise.all(playlistIdArray).then(p => {
-                p.forEach(d => {
-                    console.log(d.body);
-                });
-            }, onReject => console.error(onReject));
-        },
-        onReject => console.error(onReject)
-    );
-}
-
 function combinePlaylists(collectedDataArray) {
     let uniqueSongObject = {};
     collectedDataArray.forEach(collectedDataSet => {
