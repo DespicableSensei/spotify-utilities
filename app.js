@@ -458,12 +458,6 @@ app.get("/playlistsil", (req, res) => {
     }, onReject => console.error(onReject))
 })
 
-app.get("/beo", (req, res) => {
-    spotifyApi.unfollowPlaylist("4QD689aFQjPiOOyxKI3NBS").then(f => {
-        console.log(f)
-    }, r => console.error(r))
-})
-
 app.post("/api/combineUserPlaylists/", (req, res) => {
     let userIdArray = req.body.userArray;
     if (userIdArray.length > 5) {
