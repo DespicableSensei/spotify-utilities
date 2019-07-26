@@ -392,7 +392,9 @@ app.get("/nostalji-cagiriliyor", (req, res) => {
     let promiseArray = optionsArray.map(opt =>
         spotifyApi.getMyTopTracks(opt)
     );
+    let pureData;
     Promise.all(promiseArray).then(onFulfill => {
+        pureData = onFulfill.map(y => y.body)
         let itemsByTimeframes = onFulfill.map(f => f.body.items);
         let trackObject = {}
         itemsByTimeframes.forEach((timeframe, timeframeIndex) => {
@@ -431,7 +433,22 @@ app.get("/nostalji-cagiriliyor", (req, res) => {
             trackObject[trackId] = track;
         });
         let playlistTrackArray = trackKeys.map(x => trackObject[x]).sort((a,b) => b.score - a.score).slice(0, 50);
-        console.log(playlistTrackArray.map(x => x.name))
+        let playlistUris = playlistTrackArray.map(x => "spotify:track:" + x.id);
+        let playlistDate = moment().format("DD.MM.YYYY").toString();
+        let description = `Kümülatif 50'yi zaman ağırlıklı ortalama gibi düşünebilirsin. matematiksel olarak en çok açmak isteyebileceğin sıradalar. ` + playlistDate;
+        spotifyApi.createPlaylist(me, name, {public: true, description: description}).then(onFulfill => {
+            let playlistId = onFulfill.body.id;
+            spotifyApi.addTracksToPlaylist(playlistId, playlistUris).then(onFulfilled => {
+                fs.createReadStream(path.join(__dirname + "/public/image/nostalji.jpeg"), {encoding: "base64"}).pipe(
+                    request.put(`https://api.spotify.com/v1/users/${me}/playlists/${playlistId}/images`,{headers: {"Authorization": "Bearer " + token, "Content-Type": "image/jpeg"}}, () => {
+                        db.ref("generatedPlaylists/" + myDBname).push({type: "nostaljik", tracks: playlistTrackArray, date: playlistDate, description: description, url: onFulfill.body.external_urls.spotify});
+                        pureData.Date = playlistDate;
+                        db.ref("collectedData/" + myDBname).push(pureData);
+                        res.render("coverpage", {name:name,url:onFulfill.body.external_urls.spotify,img:"nostaljik"});
+                    })
+                );
+            }, onReject => console.error(onReject))
+        }, onReject => console.error(onReject))
     })
 });
 
