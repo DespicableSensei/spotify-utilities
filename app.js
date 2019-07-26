@@ -435,11 +435,11 @@ app.get("/nostalji-cagiriliyor", (req, res) => {
         let playlistTrackArray = trackKeys.map(x => trackObject[x]).sort((a,b) => b.score - a.score).slice(0, 50);
         let playlistUris = playlistTrackArray.map(x => "spotify:track:" + x.id);
         let playlistDate = moment().format("DD.MM.YYYY").toString();
-        let description = `Kümülatif 50'yi zaman ağırlıklı ortalama gibi düşünebilirsin. matematiksel olarak en çok açmak isteyebileceğin sıradalar. ` + playlistDate;
+        let description = `Nostaljik 50 bir ara sevdiğin sonra arada kaynayıp giden şarkıları tekrar gün yüzüne çıkarmak için var. ` + playlistDate;
         spotifyApi.createPlaylist(me, name, {public: true, description: description}).then(onFulfill => {
             let playlistId = onFulfill.body.id;
             spotifyApi.addTracksToPlaylist(playlistId, playlistUris).then(onFulfilled => {
-                fs.createReadStream(path.join(__dirname + "/public/image/nostalji.jpeg"), {encoding: "base64"}).pipe(
+                fs.createReadStream(path.join(__dirname + "/public/image/nostaljik.jpeg"), {encoding: "base64"}).pipe(
                     request.put(`https://api.spotify.com/v1/users/${me}/playlists/${playlistId}/images`,{headers: {"Authorization": "Bearer " + token, "Content-Type": "image/jpeg"}}, () => {
                         db.ref("generatedPlaylists/" + myDBname).push({type: "nostaljik", tracks: playlistTrackArray, date: playlistDate, description: description, url: onFulfill.body.external_urls.spotify});
                         pureData.Date = playlistDate;
