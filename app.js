@@ -70,8 +70,8 @@ app.get("/gotcode", async (req, res) => {
         else if (req.query.state === "a50m") {
             res.redirect("a50-picker");
         }
-        else if (req.query.state === "e50") {
-            res.redirect("elli");
+        else if (req.query.state === "n50") {
+            res.redirect("/nostalji-cagiriliyor");
         }
         else {
             res.send(`<p>You have logged in with: ${req.query.code}</p><a href="/utilities">Utilities</a>`);
@@ -366,6 +366,11 @@ app.get("/a50", (req,res) => {
     res.redirect(aURL);
 });
 
+app.get("/n50", (req,res) => {
+    var aURL = spotifyApi.createAuthorizeURL(scopes,"n50");
+    res.redirect(aURL);
+});
+
 app.get("/a50m", (req,res) => {
     var aURL = spotifyApi.createAuthorizeURL(scopes,"a50m");
     res.redirect(aURL);
@@ -374,9 +379,60 @@ app.get("/a50m", (req,res) => {
 app.get("/a50-picker", (req,res) => {
     spotifyApi.getMyTopArtists({time_range: "long_term", limit: 50}).then(onFullfill => {
         let pickerArray = onFullfill.body.items;
-        console.log(pickerArray[5].images)
         res.render("picker", {pickerArray: pickerArray})
     }, onReject => console.error(onReject))
+});
+
+app.get("/nostalji-cagiriliyor", (req, res) => {
+    let name = "Nostaljik 50";
+    let timeFrames = ["long_term", "medium_term", "short_term"];
+    let optionsArray = timeFrames.map(time => {
+        return { limit: 50, offset: 0, time_range: time };
+    });
+    let promiseArray = optionsArray.map(opt =>
+        spotifyApi.getMyTopTracks(opt)
+    );
+    Promise.all(promiseArray).then(onFulfill => {
+        let itemsByTimeframes = onFulfill.map(f => f.body.items);
+        let trackObject = {}
+        itemsByTimeframes.forEach((timeframe, timeframeIndex) => {
+            timeframe.forEach((track, trackIndex) => {
+                if (trackObject[track.id]) {
+                    let trackToModify = trackObject[track.id];
+                    trackToModify.existsIn.push(timeframeIndex)
+                    trackToModify.indexInTimeframes[timeframeIndex] = trackIndex
+                    trackObject[track.id] = trackToModify;
+                } else {
+                    let newTrack = {
+                        id: track.id,
+                        name: track.name,
+                        artist: track.artists[0],
+                        album: track.album,
+                        existsIn: [timeframeIndex],
+                        indexInTimeframes: [0, 0, 0]
+                    };
+                    newTrack.indexInTimeframes[timeframeIndex] = trackIndex
+                    trackObject[track.id] = newTrack
+                }
+            })
+        })
+        let trackKeys = Object.keys(trackObject);
+        trackKeys.forEach(trackId => {
+            let score = 0;
+            let track = trackObject[trackId];
+            let scoreMultipliers = [40, 20, 10];
+            let indexScores = track.indexInTimeframes.map(i =>
+                i == 0 ? 0 : 50 - i
+            );
+            for (var i = 0; i < 3; i++) {
+                score += scoreMultipliers[i] * indexScores[i];
+            }
+            track.score = score;
+            trackObject[trackId] = track;
+        });
+        let playlistTrackArray = trackKeys.map(x => trackObject[x]).sort((a,b) => b.score - a.score).slice(0, 50);
+        console.log(playlistTrackArray.map(x => x.name))
+    })
 });
 
 app.get("/your_playlist_will_be_ready_very_soon", (req,res) => {
