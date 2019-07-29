@@ -586,6 +586,147 @@ app.post("/api/combineUserPlaylists/", (req, res) => {
     }
 });
 
+app.get("api/nostaljik:pa:pb:pc:log:none", (req, res) => {
+    let name = "Nostaljik 50";
+    let timeFrames = ["long_term", "medium_term", "short_term"];
+    let optionsArray = timeFrames.map(time => {
+        return { limit: 50, offset: 0, time_range: time };
+    });
+    let promiseArray = optionsArray.map(opt => spotifyApi.getMyTopTracks(opt));
+    let pureData;
+    Promise.all(promiseArray).then(onFulfill => {
+        pureData = onFulfill.map(y => y.body);
+        let itemsByTimeframes = onFulfill.map(f => f.body.items);
+        let trackObject = {};
+        itemsByTimeframes.forEach((timeframe, timeframeIndex) => {
+            timeframe.forEach((track, trackIndex) => {
+                if (trackObject[track.id]) {
+                    let trackToModify = trackObject[track.id];
+                    trackToModify.existsIn.push(timeframeIndex);
+                    trackToModify.indexInTimeframes[
+                        timeframeIndex
+                    ] = trackIndex;
+                    trackObject[track.id] = trackToModify;
+                } else {
+                    let newTrack = {
+                        id: track.id,
+                        name: track.name,
+                        artist: track.artists[0],
+                        album: track.album,
+                        existsIn: [timeframeIndex],
+                        indexInTimeframes: [0, 0, 0],
+                    };
+                    newTrack.indexInTimeframes[timeframeIndex] = trackIndex;
+                    trackObject[track.id] = newTrack;
+                }
+            });
+        });
+        let trackKeys = Object.keys(trackObject);
+        trackKeys.forEach(trackId => {
+            let score = 0;
+            let track = trackObject[trackId];
+            let scoreMultipliers = [40, 20, 10];
+            if (req.params.pa && req.params.pb && req.params.pc) {
+                scoreMultipliers = [
+                    parseInt(req.params.pa),
+                    parseInt(req.params.pb),
+                    parseInt(req.params.pc),
+                ];
+            }
+            if (req.params.log == "true") {
+                scoreMultipliers = scoreMultipliers.map(s => Math.log(s) * s);
+            }
+            let indexScores = track.indexInTimeframes.map(i =>
+                i == 0 ? 0 : 50 - i
+            );
+            for (var i = 0; i < 3; i++) {
+                score += scoreMultipliers[i] * indexScores[i];
+            }
+            track.score = score;
+            trackObject[trackId] = track;
+        });
+        let playlistTrackArray = trackKeys
+            .map(x => trackObject[x])
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 50);
+        let playlistUris = playlistTrackArray.map(x => "spotify:track:" + x.id);
+        let playlistDate = moment()
+            .format("DD.MM.YYYY")
+            .toString();
+        let description =
+            `Nostaljik 50 bir ara sevdiğin sonra arada kaynayıp giden şarkıları tekrar gün yüzüne çıkarmak için var. ` +
+            playlistDate;
+        let playlistObject = {}
+        spotifyApi
+            .createPlaylist(me, name, {
+                public: true,
+                description: description,
+            })
+            .then(
+                onFulfill => {
+                    let playlistId = onFulfill.body.id;
+                    spotifyApi
+                        .addTracksToPlaylist(me, playlistId, playlistUris)
+                        .then(
+                            onFulfilled => {
+                                playlistObject = {
+                                    type:
+                                        "nostaljik",
+                                    tracks: playlistTrackArray,
+                                    date: playlistDate,
+                                    description: description,
+                                    url:
+                                        onFulfill
+                                            .body
+                                            .external_urls
+                                            .spotify,
+                                };
+                                fs.createReadStream(
+                                    path.join(
+                                        __dirname +
+                                            "/public/image/nostaljik.jpeg"
+                                    ),
+                                    { encoding: "base64" }
+                                ).pipe(
+                                    request.put(
+                                        `https://api.spotify.com/v1/users/${me}/playlists/${playlistId}/images`,
+                                        {
+                                            headers: {
+                                                Authorization:
+                                                    "Bearer " + token,
+                                                "Content-Type": "image/jpeg",
+                                            },
+                                        },
+                                        () => {
+                                            db.ref(
+                                                "generatedPlaylists/" + myDBname
+                                            ).push({
+                                                type: "nostaljik",
+                                                tracks: playlistTrackArray,
+                                                date: playlistDate,
+                                                description: description,
+                                                url:
+                                                    onFulfill.body.external_urls
+                                                        .spotify,
+                                            });
+                                            pureData.Date = playlistDate;
+                                            db.ref(
+                                                "collectedData/" + myDBname
+                                            ).push(pureData);
+                                            console.log(playlistObject)
+                                            res.send(playlistObject)
+                                        }
+                                    )
+                                );
+                            },
+                            onReject => console.error(onReject)
+                        );
+                },
+                onReject => console.error(onReject)
+            );
+    });
+});
+
 
 app.listen((process.env.PORT || 5000), () => console.log('App listening on port ' + (process.env.PORT || 5000)));
 
