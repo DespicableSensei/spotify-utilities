@@ -586,7 +586,7 @@ app.post("/api/combineUserPlaylists/", (req, res) => {
     }
 });
 
-app.get("api/nostaljik:pa:pb:pc:log:none", (req, res) => {
+app.get("/api/nostaljik:pa:pb:pc:log:none", (req, res) => {
     let name = "Nostaljik 50";
     let timeFrames = ["long_term", "medium_term", "short_term"];
     let optionsArray = timeFrames.map(time => {
