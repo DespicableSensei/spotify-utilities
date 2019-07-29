@@ -586,7 +586,7 @@ app.post("/api/combineUserPlaylists/", (req, res) => {
     }
 });
 
-app.get("/api/nostaljik:pa:pb:pc:log:none", (req, res) => {
+app.post("/api/nostaljik/", (req, res) => {
     let name = "Nostaljik 50";
     let timeFrames = ["long_term", "medium_term", "short_term"];
     let optionsArray = timeFrames.map(time => {
@@ -626,14 +626,14 @@ app.get("/api/nostaljik:pa:pb:pc:log:none", (req, res) => {
             let score = 0;
             let track = trackObject[trackId];
             let scoreMultipliers = [40, 20, 10];
-            if (req.params.pa && req.params.pb && req.params.pc) {
+            if (req.query.pa && req.query.pb && req.query.pc) {
                 scoreMultipliers = [
-                    parseInt(req.params.pa),
-                    parseInt(req.params.pb),
-                    parseInt(req.params.pc),
+                    parseInt(req.query.pa),
+                    parseInt(req.query.pb),
+                    parseInt(req.query.pc),
                 ];
             }
-            if (req.params.log == "true") {
+            if (req.query.log == "true") {
                 scoreMultipliers = scoreMultipliers.map(s => Math.log(s) * s);
             }
             let indexScores = track.indexInTimeframes.map(i =>
@@ -656,7 +656,7 @@ app.get("/api/nostaljik:pa:pb:pc:log:none", (req, res) => {
         let description =
             `Nostaljik 50 bir ara sevdiğin sonra arada kaynayıp giden şarkıları tekrar gün yüzüne çıkarmak için var. ` +
             playlistDate;
-        let playlistObject = {}
+        let playlistObject = {};
         spotifyApi
             .createPlaylist(me, name, {
                 public: true,
@@ -670,16 +670,11 @@ app.get("/api/nostaljik:pa:pb:pc:log:none", (req, res) => {
                         .then(
                             onFulfilled => {
                                 playlistObject = {
-                                    type:
-                                        "nostaljik",
+                                    type: "nostaljik",
                                     tracks: playlistTrackArray,
                                     date: playlistDate,
                                     description: description,
-                                    url:
-                                        onFulfill
-                                            .body
-                                            .external_urls
-                                            .spotify,
+                                    url: onFulfill.body.external_urls.spotify,
                                 };
                                 fs.createReadStream(
                                     path.join(
@@ -713,20 +708,29 @@ app.get("/api/nostaljik:pa:pb:pc:log:none", (req, res) => {
                                             db.ref(
                                                 "collectedData/" + myDBname
                                             ).push(pureData);
-                                            console.log(playlistObject)
-                                            res.send(playlistObject)
+                                            console.log(playlistObject);
+                                            res.send(playlistObject);
                                         }
                                     )
                                 );
                             },
-                            onReject => console.error(onReject)
+                            onReject => {
+                                console.error(onReject)
+                                res.status(500).send()
+                            }
                         );
                 },
-                onReject => console.error(onReject)
+                onReject => {
+                    console.error(onReject)
+                    res.status(500).send();
+                }
             );
+    }, onReject => {
+        console.error(onReject)
+        res.status(500).send()
     });
 });
-
+ app.get("/len", (req, res) => res.send(200))
 
 app.listen((process.env.PORT || 5000), () => console.log('App listening on port ' + (process.env.PORT || 5000)));
 
