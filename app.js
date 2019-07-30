@@ -357,11 +357,6 @@ app.get("/c50", (req,res) => {
     res.redirect(aURL);
 });
 
-app.get("/e50", (req,res) => {
-    var aURL = spotifyApi.createAuthorizeURL(scopes,"e50");
-    res.redirect(aURL);
-});
-
 app.get("/a50", (req,res) => {
     var aURL = spotifyApi.createAuthorizeURL(scopes,"a50");
     res.redirect(aURL);
@@ -734,7 +729,43 @@ app.post("/api/nostaljik/", (req, res) => {
         res.status(500).send()
     });
 });
- app.get("/len", (req, res) => res.send(200))
+
+app.get("/nextGen", (req, res) => {
+    let timeFrames = ["long_term", "medium_term", "short_term"];
+    let optionsArray = timeFrames.map(time => {
+        return { limit: 50, offset: 0, time_range: time };
+    });
+    let promiseArray = optionsArray.map(opt =>
+        spotifyApi.getMyTopTracks(opt)
+    );
+    Promise.all(promiseArray).then(onFulfill => {
+        let itemsByTimeframes = onFulfill.map(timeFrame => {
+            return timeFrame.body.items.map((t, i) => {
+                let track = t;
+                track.index = i;
+                return t
+            })
+        });
+        let audioPromiseArray = itemsByTimeframes.map(f => {
+            let idsInTimeframe = f.map(t => t.id)
+            return spotifyApi.getAudioFeaturesForTracks(idsInTimeframe)
+        });
+        Promise.all(audioPromiseArray).then(onFulfillAudio => {
+            let audioFeaturesByTimeframes = onFulfillAudio.map(af => af.body.audio_features)
+            let characteristicsByTimeframes = audioFeaturesByTimeframes.map(af => {
+                let meanCharacteristicsObject = {
+                    meanDanceablity: af.reduce((a,v) => a + v.danceability, 0),
+                    meanInstrumentalness: af.reduce((a,v) => a + v.instrumentalness, 0),
+                    meanTempo: af.reduce((a,v) => a + v.tempo, 0),
+                    meanAcousticness: af.reduce((a,v) => a + v.acousticness, 0),
+                    meanEnergy: af.reduce((a,v) => a + v.energy, 0)
+                };
+                return meanCharacteristicsObject
+            });
+            console.log(characteristicsByTimeframes)
+        }, onRejectAudio => console.error(onRejectAudio))
+    }, onReject => console.error(onReject))
+})
 
 app.listen((process.env.PORT || 5000), () => console.log('App listening on port ' + (process.env.PORT || 5000)));
 
