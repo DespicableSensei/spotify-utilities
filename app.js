@@ -340,6 +340,7 @@ app.get("/playlistin-neredeyse-hazir-olmak-uzere", (req,res) => {
                                     db.ref("generatedPlaylists/" + myDBname).push({ type: "fresh", tracks: addedTopTracks, date: playlistDate, description: playlistDescription, url: newPlaylist.body.external_urls.spotify });
                                     collectedData.Date = playlistDate;
                                     db.ref("collectedData/" + myDBname).push(collectedData);
+                                    resetLogin();
                                     res.render("coverpage", { name: playlistName, url: newPlaylist.body.external_urls.spotify, img: "fresh" });
                                 })
                             );
@@ -456,6 +457,7 @@ app.get("/nostalji-cagiriliyor", (req, res) => {
                         db.ref("generatedPlaylists/" + myDBname).push({type: "nostaljik", tracks: playlistTrackArray, date: playlistDate, description: description, url: onFulfill.body.external_urls.spotify});
                         pureData.Date = playlistDate;
                         db.ref("collectedData/" + myDBname).push(pureData);
+                        resetLogin();
                         res.render("coverpage", {name:name,url:onFulfill.body.external_urls.spotify,img:"nostaljik"});
                     })
                 );
@@ -505,6 +507,7 @@ app.get("/your_playlist_will_be_ready_very_soon", (req,res) => {
                         db.ref("generatedPlaylists/" + myDBname).push({type: "kümülatif", tracks: playlistTracks, date: playlistDate, description: description, url: newPlaylist.body.external_urls.spotify});
                         pureData.Date = playlistDate;
                         db.ref("collectedData/" + myDBname).push(pureData);
+                        resetLogin();
                         res.render("coverpage", {name:name,url:newPlaylist.body.external_urls.spotify,img:"top"});
                     })
                 );
@@ -709,6 +712,7 @@ app.post("/api/nostaljik/", (req, res) => {
                                                 "collectedData/" + myDBname
                                             ).push(pureData);
                                             console.log(playlistObject);
+                                            resetLogin()
                                             res.send(playlistObject);
                                         }
                                     )
@@ -745,6 +749,12 @@ Array.prototype.shuffle = function () {
     }
     return this;
 };
+
+function resetLogin() {
+    spotifyApi.resetAccessToken();
+    spotifyApi.resetRefreshToken();
+    spotifyApi.resetCode();
+}
 
 function calcScore(ti,li) {
     return (50-ti)*(3-li);
