@@ -738,13 +738,22 @@ app.get("/nextGen", (req, res) => {
     let promiseArray = optionsArray.map(opt =>
         spotifyApi.getMyTopTracks(opt)
     );
+    let recurringArtistObject = {}
     Promise.all(promiseArray).then(onFulfill => {
         let itemsByTimeframes = onFulfill.map(timeFrame => {
             return timeFrame.body.items.map((t, i) => {
                 let track = t;
+                let recurredArtist = recurringArtistObject[track.artists[0].id]
                 track.index = i;
+                if (recurredArtist) {
+                    recurringArtistObject[track.artists[0].id].count++
+                } else {
+                    let thisArtist = track.artists[0];
+                    thisArtist.count = 1;
+                    recurringArtistObject[thisArtist.id] = thisArtist;
+                }
                 return t
-            })
+            });
         });
         let audioPromiseArray = itemsByTimeframes.map(f => {
             let idsInTimeframe = f.map(t => t.id)
@@ -754,15 +763,64 @@ app.get("/nextGen", (req, res) => {
             let audioFeaturesByTimeframes = onFulfillAudio.map(af => af.body.audio_features)
             let characteristicsByTimeframes = audioFeaturesByTimeframes.map(af => {
                 let meanCharacteristicsObject = {
-                    meanDanceablity: af.reduce((a,v) => a + v.danceability, 0),
-                    meanInstrumentalness: af.reduce((a,v) => a + v.instrumentalness, 0),
-                    meanTempo: af.reduce((a,v) => a + v.tempo, 0),
-                    meanAcousticness: af.reduce((a,v) => a + v.acousticness, 0),
-                    meanEnergy: af.reduce((a,v) => a + v.energy, 0)
+                    meanDanceability: af.reduce((a,v) => a + v.danceability, 0) / af.length,
+                    meanInstrumentalness: af.reduce((a,v) => a + v.instrumentalness, 0) / af.length,
+                    meanTempo: af.reduce((a,v) => a + v.tempo, 0) / af.length,
+                    meanAcousticness: af.reduce((a,v) => a + v.acousticness, 0) / af.length,
+                    meanEnergy: af.reduce((a,v) => a + v.energy, 0) / af.length
                 };
                 return meanCharacteristicsObject
             });
-            console.log(characteristicsByTimeframes)
+            //Perhaps weight these characteristics?
+            let allMeanCharacteristicsObject = {
+                meanDanceability:
+                    characteristicsByTimeframes.reduce(
+                        (a, v) => a + v.meanDanceability,
+                        0
+                    ) / characteristicsByTimeframes.length,
+                meanInstrumentalness:
+                    characteristicsByTimeframes.reduce(
+                        (a, v) => a + v.meanInstrumentalness,
+                        0
+                    ) / characteristicsByTimeframes.length,
+                meanTempo:
+                    characteristicsByTimeframes.reduce(
+                        (a, v) => a + v.meanTempo,
+                        0
+                    ) / characteristicsByTimeframes.length,
+                meanAcousticness:
+                    characteristicsByTimeframes.reduce(
+                        (a, v) => a + v.meanAcousticness,
+                        0
+                    ) / characteristicsByTimeframes.length,
+                meanEnergy:
+                    characteristicsByTimeframes.reduce(
+                        (a, v) => a + v.meanEnergy,
+                        0
+                    ) / characteristicsByTimeframes.length,
+            };
+            let uniqueArtistIds = Object.keys(recurringArtistObject);
+            let sortedUniqueArtists = uniqueArtistIds.map(aid => recurringArtistObject[aid]).sort((a, b) => b.count - a.count)
+            let myTopThreeArtists = sortedUniqueArtists.slice(0, 3)
+            let myTopThreeArtistIds = myTopThreeArtists.map(a => a.id)
+            let recommendationOptions = {
+                "seed_artists": myTopThreeArtistIds,
+                "target_danceability": allMeanCharacteristicsObject.meanDanceability,
+                "target_energy": allMeanCharacteristicsObject.meanEnergy,
+                "target_tempo": allMeanCharacteristicsObject.meanTempo,
+                "target_acousticness": allMeanCharacteristicsObject.meanAcousticness,
+                "target_instrumentalness": allMeanCharacteristicsObject.meanInstrumentalness
+            }
+            spotifyApi.getRecommendations(recommendationOptions).then(onFulfillRecommendations => {
+                let myseedsobject = onFulfillRecommendations.body.seeds
+                let mytracksobject = onFulfillRecommendations.body.tracks
+                spotifyApi.createPlaylist(me, "nextGen", {public: true}).then(onFulfillPlaylist => {
+                    let newPlaylistId = onFulfillPlaylist.body.id
+                    spotifyApi.addTracksToPlaylist(me, newPlaylistId, mytracksobject.map(t => t.uri)).then(onFulfillAdding => {
+                        res.redirect(onFulfillPlaylist.body.external_urls.spotify)
+                    }, onRejectAdding => console.error(onRejectAdding))
+                }, onRejectPlaylist => console.error(onRejectPlaylist))
+            }, onRejectRecommendations => console.error(onRejectRecommendations))
         }, onRejectAudio => console.error(onRejectAudio))
     }, onReject => console.error(onReject))
 })
