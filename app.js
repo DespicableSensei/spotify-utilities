@@ -842,7 +842,7 @@ Array.prototype.shuffle = function () {
 function resetLogin() {
     spotifyApi.resetAccessToken();
     spotifyApi.resetRefreshToken();
-    spotifyApi.resetCode();
+    spotifyApi.resetCredentials();
 }
 
 function calcScore(ti,li) {
