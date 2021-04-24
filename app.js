@@ -4,7 +4,7 @@ const fileUpload = require('express-fileupload')
 const fs = require("fs")
 const path = require("path")
 const request = require("request")
-const sharp = require("sharp")
+//const sharp = require("sharp")
 let moment = require("moment")
 var firebase = require("firebase")
 var morgan = require('morgan')
@@ -93,11 +93,11 @@ app.get("/utilities/playlistchosen", (req,res) => {
         let playlistName = data.body.name;
         const orderedArray = data.body.tracks.items.map(x => x.track.id);
         var shuffledArray = orderedArray.shuffle();
-        spotifyApi.createPlaylist(me, playlistName + " [SHUFFLED]", { 'public' : false }).then(newPlaylist => {
+        spotifyApi.createPlaylist(playlistName + " [SHUFFLED]", { 'public' : false }).then(newPlaylist => {
             const newListId = newPlaylist.body.id;
             const newListUrl = newPlaylist.body.external_urls.spotify;
             const tracksString = shuffledArray.map(x => "spotify:track:" + x);
-            spotifyApi.addTracksToPlaylist(me,newListId,tracksString).then(tracksAdded => {
+            spotifyApi.addTracksToPlaylist(newListId,tracksString).then(tracksAdded => {
                 res.send(`<a href="${newListUrl}">${playlistName} [SHUFFLED] on Spotify</a>`);
             }, onReject => console.log(onReject));
         }, onReject => console.log(onReject));
@@ -115,10 +115,10 @@ app.get("/utilities/topsongs", (req,res) => {
     spotifyApi.getMe().then(x => me = x.body.id, err => res.send(err));
     spotifyApi.getMyTopTracks(options).then(data => {
         let tt = data.body.items.map(x => x.uri);
-        spotifyApi.createPlaylist(me, name, { 'public' : false }).then((dataa) => {
+        spotifyApi.createPlaylist(name, { 'public' : false }).then((dataa) => {
             const newListId = dataa.body.id;
             const newListUrl = dataa.body["external_urls"]["spotify"];
-            spotifyApi.addTracksToPlaylist(me,newListId,tt).then(clg => res.send(`<a href="${newListUrl}">${name} on Spotify</a>`),err => console.log("82!",err));
+            spotifyApi.addTracksToPlaylist(newListId,tt).then(clg => res.send(`<a href="${newListUrl}">${name} on Spotify</a>`),err => console.log("82!",err));
         }, (err) => {
             console.log('84!', err);
             res.send(err)
@@ -493,8 +493,8 @@ app.get("/your_playlist_will_be_ready_very_soon", (req,res) => {
         let playlistUris = playlistTracks.map(track => "spotify:track:" + track.id);
         let playlistDate = moment().format("DD.MM.YYYY").toString();
         let description = `Kümülatif 50'yi zaman ağırlıklı ortalama gibi düşünebilirsin. matematiksel olarak en çok açmak isteyebileceğin sıradalar. ` + playlistDate;
-        spotifyApi.createPlaylist(me,name,{public: true, description: description}).then(newPlaylist => {
-            spotifyApi.addTracksToPlaylist(me,newPlaylist.body.id,playlistUris).then(tracksAdded => {
+        spotifyApi.createPlaylist(name,{public: true, description: description}).then(newPlaylist => {
+            spotifyApi.addTracksToPlaylist(newPlaylist.body.id,playlistUris).then(tracksAdded => {
                 //console.log(playlistTracks);
                 //Adding a cover image.
                 fs.createReadStream(path.join(__dirname + "/public/image/top.jpeg"), {encoding: "base64"}).pipe(
