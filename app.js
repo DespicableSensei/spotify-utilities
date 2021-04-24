@@ -843,6 +843,7 @@ function resetLogin() {
     spotifyApi.resetAccessToken();
     spotifyApi.resetRefreshToken();
     spotifyApi.resetCredentials();
+    console.log("Login RESET");
 }
 
 function calcScore(ti,li) {
