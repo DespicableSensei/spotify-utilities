@@ -842,7 +842,6 @@ Array.prototype.shuffle = function () {
 function resetLogin() {
     spotifyApi.resetAccessToken();
     spotifyApi.resetRefreshToken();
-    spotifyApi.resetCredentials();
     console.log("Login RESET");
 }
 
